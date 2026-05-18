@@ -1,5 +1,6 @@
 """Memoria engine — business logic for ingest, recall, decay, and sleep."""
 
 from memoria.engine.decay import DecayEngine
+from memoria.engine.sleep import SleepEngine
 
-__all__ = ["DecayEngine"]
+__all__ = ["DecayEngine", "SleepEngine"]
