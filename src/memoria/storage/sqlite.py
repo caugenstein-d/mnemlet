@@ -84,16 +84,26 @@ END;
 
 
 class MemoriaDB:
-    """SQLite database for Memoria."""
+    """SQLite database for Memoria.
+
+    Note: This class is NOT thread-safe for writes. Use a single-threaded access pattern
+    (which FastAPI's async event loop provides natively). For multi-threaded access,
+    instantiate with `MemoriaDB(path)`, then set `db._lock = threading.Lock()` and wrap
+    write operations.
+    """
 
     def __init__(self, db_path: Path):
         self.db_path = db_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        # check_same_thread=False is required for FastAPI async handlers.
+        # WAL mode allows concurrent reads safely. Write serialization is
+        # handled by FastAPI's single-threaded async event loop.
         self.conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.executescript(SCHEMA)
+        self._lock = None  # Lock not included by default; add if needed
         self.conn.commit()
 
     def _list_tables(self) -> list[str]:
@@ -102,6 +112,19 @@ class MemoriaDB:
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
         return [r[0] for r in rows]
+
+    def close(self):
+        """Close the database connection."""
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
     def insert_memory(
         self,
@@ -126,7 +149,10 @@ class MemoriaDB:
              now, now, json.dumps(metadata or {})),
         )
         self.conn.commit()
-        return dict(self.get_memory(mid))
+        result = self.get_memory(mid)
+        if result is None:
+            raise RuntimeError(f"Memory {mid} not found after insert")
+        return dict(result)
 
     def get_memory(self, memory_id: str) -> Optional[dict]:
         """Retrieve a memory by ID."""
@@ -134,6 +160,15 @@ class MemoriaDB:
             "SELECT * FROM memories WHERE id = ?", (memory_id,)
         ).fetchone()
         return dict(row) if row else None
+
+    def _sanitize_fts_query(self, query: str) -> str:
+        """Sanitize user input for FTS5 MATCH queries.
+        
+        Wraps the query in double quotes to prevent FTS5 syntax characters
+        (*, -, AND, OR, NEAR) from being interpreted as operators.
+        """
+        safe = query.replace('"', '""')
+        return f'"{safe}"'
 
     def search_fts(self, query: str, namespace: Optional[str] = None, limit: int = 5) -> list[dict]:
         """Full-text search using FTS5."""
@@ -145,7 +180,7 @@ class MemoriaDB:
                    JOIN memories ON memories_fts.rowid = memories.rowid
                    WHERE memories_fts MATCH ? AND memories.namespace = ?
                    ORDER BY rank LIMIT ?""",
-                (query, namespace, limit),
+                (self._sanitize_fts_query(query), namespace, limit),
             ).fetchall()
         else:
             rows = self.conn.execute(
@@ -155,7 +190,7 @@ class MemoriaDB:
                    JOIN memories ON memories_fts.rowid = memories.rowid
                    WHERE memories_fts MATCH ?
                    ORDER BY rank LIMIT ?""",
-                (query, limit),
+                (self._sanitize_fts_query(query), limit),
             ).fetchall()
         return [dict(r) for r in rows]
 
