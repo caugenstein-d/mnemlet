@@ -11,7 +11,7 @@ from memoria.storage.embeddings import MemoriaEmbedding
 from memoria.engine.ingest import IngestEngine
 from memoria.engine.recall import RecallEngine
 from memoria.engine.decay import DecayEngine
-from memoria.server.routes import ingest, recall, status
+from memoria.server.routes import decay, ingest, recall, status
 
 
 @asynccontextmanager
@@ -73,6 +73,7 @@ def create_app(config: MemoriaConfig = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.include_router(decay.router)
     app.include_router(ingest.router)
     app.include_router(recall.router)
     app.include_router(status.router)

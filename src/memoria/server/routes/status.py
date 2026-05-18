@@ -1,6 +1,7 @@
 """GET /api/v1/status and /api/v1/health — System status."""
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 
 
 router = APIRouter(prefix="/api/v1", tags=["status"])
@@ -36,3 +37,36 @@ async def status(request: Request):
         "chroma_documents": chroma_count,
         "version": "0.1.0",
     }
+
+
+class DecayConfigRequest(BaseModel):
+    lambda_: float = Field(default=0.01, ge=0.0, le=1.0, alias="lambda")
+    purge_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
+    hard_delete_threshold: float = Field(default=0.01, ge=0.0, le=1.0)
+    hard_delete_age_days: int = Field(default=90, ge=1)
+
+
+@router.get("/namespaces/{namespace}/decay")
+async def get_decay_config(namespace: str, request: Request):
+    """Get decay configuration for a namespace."""
+    config = request.app.state.db.get_decay_config(namespace)
+    if config is None:
+        return {
+            "namespace": namespace, "lambda": 0.01, "purge_threshold": 0.05,
+            "hard_delete_threshold": 0.01, "hard_delete_age_days": 90,
+            "note": "using defaults — no custom config set",
+        }
+    return config
+
+
+@router.put("/namespaces/{namespace}/decay")
+async def set_decay_config(namespace: str, req: DecayConfigRequest, request: Request):
+    """Set decay configuration for a namespace."""
+    config = request.app.state.db.set_decay_config(
+        namespace=namespace,
+        lambda_=req.lambda_,
+        purge_threshold=req.purge_threshold,
+        hard_delete_threshold=req.hard_delete_threshold,
+        hard_delete_age_days=req.hard_delete_age_days,
+    )
+    return config
