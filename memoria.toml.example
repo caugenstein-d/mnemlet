@@ -1,0 +1,13 @@
+[server]
+host = "127.0.0.1"
+port = 4050
+
+[storage]
+data_dir = "~/.memoria"
+sqlite_path = "~/.memoria/memoria.db"
+chroma_path = "~/.memoria/chroma"
+vault_path = "~/.memoria/vault"
+
+[embedding]
+model = "all-MiniLM-L6-v2"
+cache_dir = "~/.memoria/models"
