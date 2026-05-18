@@ -11,3 +11,19 @@ vault_path = "~/.memoria/vault"
 [embedding]
 model = "all-MiniLM-L6-v2"
 cache_dir = "~/.memoria/models"
+
+[llm]
+enabled = false
+provider = "ollama"
+model = "gemma4-e2b:q4_0"
+base_url = "http://localhost:11434"
+temperature = 0.3
+max_tokens = 4096
+unload_after_sleep = true
+
+[search]
+enabled = false
+provider = "searxng"
+base_url = "http://localhost:8888"
+engines = ["google", "duckduckgo", "wikipedia"]
+max_queries_per_sleep = 10
