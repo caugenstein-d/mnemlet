@@ -91,3 +91,59 @@ def test_boost_applied_in_db(engine):
     interactions = engine.db.get_interactions("test-b", limit=5)
     assert len(interactions) >= 1
     assert interactions[0]["interaction_type"] == "recall"
+
+
+def test_purge_cold_storage(engine):
+    """Memories below purge threshold are moved to cold storage."""
+    engine.db.insert_memory(memory_id="cold-1", namespace="test", content_preview="fading")
+    engine.db.update_score("cold-1", 0.03)  # Below 0.05 threshold
+
+    result = engine.run_purge(purge_threshold=0.05, dry_run=False)
+    assert result["moved_to_cold"] >= 1
+    assert result["hard_deleted"] == 0
+
+    memory = engine.db.get_memory("cold-1")
+    assert memory["status"] == "cold_storage"
+
+
+def test_purge_hard_delete(engine):
+    """Very old, very low-score memories are hard-deleted."""
+    engine.db.insert_memory(memory_id="dead-1", namespace="test", content_preview="ancient")
+    engine.db.update_score("dead-1", 0.005)  # Below 0.01
+
+    # Simulate old age by directly updating created_at
+    engine.db.conn.execute(
+        "UPDATE memories SET created_at = '2025-01-01T00:00:00' WHERE id = 'dead-1'"
+    )
+    engine.db.conn.commit()
+
+    result = engine.run_purge(purge_threshold=0.05, hard_delete_threshold=0.01,
+                              hard_delete_age_days=90, dry_run=False)
+    assert result["hard_deleted"] >= 1
+
+    memory = engine.db.get_memory("dead-1")
+    assert memory is None or memory["status"] == "deleted"
+
+
+def test_purge_dry_run(engine):
+    """Dry run doesn't actually change anything."""
+    engine.db.insert_memory(memory_id="dry-1", namespace="test", content_preview="dry run test")
+    engine.db.update_score("dry-1", 0.03)
+
+    result = engine.run_purge(purge_threshold=0.05, dry_run=True)
+    assert result["moved_to_cold"] >= 1
+
+    memory = engine.db.get_memory("dry-1")
+    assert memory["status"] == "active"  # Unchanged in dry run
+
+
+def test_purge_respects_threshold(engine):
+    """Memories above threshold are not purged."""
+    engine.db.insert_memory(memory_id="keep-1", namespace="test", content_preview="important")
+    engine.db.update_score("keep-1", 0.5)  # Well above threshold
+
+    result = engine.run_purge(purge_threshold=0.05, dry_run=False)
+    assert result["moved_to_cold"] == 0
+
+    memory = engine.db.get_memory("keep-1")
+    assert memory["status"] == "active"

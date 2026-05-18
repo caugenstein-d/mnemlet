@@ -1,7 +1,7 @@
 """Decay engine: exponential time-decay + interaction weighting + purge."""
 
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from memoria.constants import (
     BOOST_CREATE, BOOST_RECALL, BOOST_UPDATE, BOOST_REFERENCE, PENALTY_IGNORE,
@@ -84,3 +84,67 @@ class DecayEngine:
         self.db.record_interaction(memory_id, interaction_type, agent_id)
 
         return dict(self.db.get_memory(memory_id))
+
+    def run_purge(
+        self,
+        purge_threshold: float = 0.05,
+        hard_delete_threshold: float = 0.01,
+        hard_delete_age_days: int = 90,
+        dry_run: bool = False,
+    ) -> dict:
+        """Run the purge pipeline: cold storage for low-score, hard delete for ancient+low.
+
+        Args:
+            purge_threshold: Scores below this move to cold_storage.
+            hard_delete_threshold: Scores below this are candidates for deletion.
+            hard_delete_age_days: Must also be older than this many days.
+            dry_run: If True, don't actually change anything.
+
+        Returns:
+            Dict with counts: {moved_to_cold, hard_deleted, checked}
+        """
+        now = datetime.now(timezone.utc)
+
+        cold_candidates = self.db.conn.execute(
+            """SELECT id, retention_score FROM memories
+               WHERE status = 'active' AND retention_score < ?""",
+            (purge_threshold,),
+        ).fetchall()
+
+        age_cutoff = (now - timedelta(days=hard_delete_age_days)).isoformat()
+        hard_candidates = self.db.conn.execute(
+            """SELECT id, retention_score FROM memories
+               WHERE status IN ('active', 'cold_storage')
+               AND retention_score < ?
+               AND created_at < ?""",
+            (hard_delete_threshold, age_cutoff),
+        ).fetchall()
+
+        moved_to_cold = 0
+        hard_deleted = 0
+
+        if not dry_run:
+            for row in cold_candidates:
+                self.db.conn.execute(
+                    "UPDATE memories SET status = 'cold_storage' WHERE id = ?",
+                    (row["id"],),
+                )
+                moved_to_cold += 1
+
+            for row in hard_candidates:
+                self.db.conn.execute(
+                    "UPDATE memories SET status = 'deleted' WHERE id = ?",
+                    (row["id"],),
+                )
+                hard_deleted += 1
+
+            self.db.conn.commit()
+        else:
+            moved_to_cold = len(cold_candidates)
+            hard_deleted = len(hard_candidates)
+
+        return {
+            "moved_to_cold": moved_to_cold,
+            "hard_deleted": hard_deleted,
+            "checked": len(cold_candidates) + len(hard_candidates),
+        }
