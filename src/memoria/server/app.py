@@ -12,6 +12,7 @@ from memoria.engine.ingest import IngestEngine
 from memoria.engine.recall import RecallEngine
 from memoria.engine.decay import DecayEngine
 from memoria.server.routes import decay, ingest, recall, status
+from memoria.server.mcp_server import create_mcp_server
 
 
 @asynccontextmanager
@@ -31,6 +32,9 @@ async def lifespan(app: FastAPI):
         chroma=app.state.chroma,
         embedder=app.state.embedder,
     )
+
+    mcp = create_mcp_server(app.state)
+    app.mount("/mcp", mcp.streamable_http_app())
 
     async def decay_loop():
         """Run decay processing every 6 hours."""
