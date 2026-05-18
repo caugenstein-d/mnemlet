@@ -1,0 +1,1 @@
+"""Memoria HTTP server — FastAPI application and routes."""
