@@ -1,6 +1,5 @@
 """Local embedding model via onnxruntime (all-MiniLM-L6-v2)."""
 
-import hashlib
 import os
 from pathlib import Path
 from typing import Optional
@@ -62,16 +61,47 @@ class MemoriaEmbedding:
         return self.embed_batch([text])[0]
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Embed multiple texts. Uses deterministic hash-based fallback."""
+        """Embed multiple texts using the ONNX model with mean pooling."""
+        session = self.model
+        tokenizer = self.tokenizer
+        input_names = [inp.name for inp in session.get_inputs()]
         results = []
+
         for text in texts:
-            h = hashlib.sha256(text.encode()).digest()
-            vec = []
-            for i in range(EMBEDDING_DIM):
-                byte_val = h[i % len(h)]
-                vec.append((byte_val / 127.5) - 1.0)
-            norm = np.sqrt(sum(v * v for v in vec))
-            results.append([v / norm for v in vec])
+            encoded = tokenizer.encode(text)
+            max_len = 512
+            ids = encoded.ids[:max_len]
+            am = encoded.attention_mask[:max_len]
+
+            arr_input_ids = np.array([ids], dtype=np.int64)
+            arr_attention_mask = np.array([am], dtype=np.int64)
+            arr_token_type_ids = np.zeros((1, len(ids)), dtype=np.int64)
+
+            feed = {}
+            for name in input_names:
+                if "input_ids" in name or name == "input_ids":
+                    feed[name] = arr_input_ids
+                elif "attention_mask" in name or name == "attention_mask":
+                    feed[name] = arr_attention_mask
+                elif "token_type_ids" in name or name == "token_type_ids":
+                    feed[name] = arr_token_type_ids
+
+            outputs = session.run(None, feed)
+            token_embeddings = outputs[0]  # (1, seq_len, hidden_dim)
+
+            mask = np.expand_dims(arr_attention_mask, axis=-1)
+            masked = token_embeddings * mask
+            summed = masked.sum(axis=1)
+            counts = np.maximum(mask.sum(axis=1), 1e-9)
+            mean_pooled = summed / counts
+
+            vec = mean_pooled[0]
+            norm = np.sqrt((vec * vec).sum())
+            if norm > 0:
+                vec = vec / norm
+
+            results.append(vec.tolist())
+
         return results
 
     def cosine_similarity(self, a: list[float], b: list[float]) -> float:

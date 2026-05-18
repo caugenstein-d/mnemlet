@@ -49,6 +49,6 @@ def test_recall_limits_results(engine):
 
 
 def test_recall_empty_result(engine):
-    """Recall returns empty list for unmatched query."""
-    results = engine.recall(query="quantum physics neutrino", namespace="preferences", limit=5)
+    """Recall returns empty list for unmatched query (with min_score threshold)."""
+    results = engine.recall(query="quantum physics neutrino", namespace="preferences", limit=5, min_score=0.3)
     assert len(results) == 0
