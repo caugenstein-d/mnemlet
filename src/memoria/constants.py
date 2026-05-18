@@ -8,6 +8,7 @@ MAX_RECALL_TOKENS = 2000
 DEDUP_THRESHOLD = 0.95
 
 # Default decay parameters
+# Exponential decay rate (higher = faster forgetting). Halbwertszeit ≈ ln(2)/λ.
 DEFAULT_LAMBDA = 0.01
 DEFAULT_PURGE_THRESHOLD = 0.05
 DEFAULT_HARD_DELETE_THRESHOLD = 0.01

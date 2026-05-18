@@ -24,6 +24,10 @@ port = 9999
 
 [storage]
 data_dir = "/tmp/memoria-test"
+
+[embedding]
+model = "custom-model"
+cache_dir = "/tmp/model-cache"
 """)
         toml_path = f.name
 
@@ -32,6 +36,8 @@ data_dir = "/tmp/memoria-test"
         assert cfg.server_host == "0.0.0.0"
         assert cfg.server_port == 9999
         assert cfg.data_dir == Path("/tmp/memoria-test")
+        assert cfg.embedding_model == "custom-model"
+        assert cfg.embedding_cache_dir == Path("/tmp/model-cache")
     finally:
         os.unlink(toml_path)
 
@@ -45,3 +51,12 @@ def test_config_from_env():
     assert cfg.server_port == 8080
     del os.environ["MEMORIA_HOST"]
     del os.environ["MEMORIA_PORT"]
+
+
+def test_config_data_dir_from_env():
+    """MEMORIA_DATA_DIR env var overrides default."""
+    os.environ["MEMORIA_DATA_DIR"] = "/tmp/memoria-custom"
+    cfg = MemoriaConfig()
+    assert cfg.data_dir == Path("/tmp/memoria-custom")
+    assert cfg.sqlite_path == Path("/tmp/memoria-custom/memoria.db")
+    del os.environ["MEMORIA_DATA_DIR"]

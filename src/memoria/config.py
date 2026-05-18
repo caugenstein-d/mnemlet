@@ -36,13 +36,10 @@ class MemoriaConfig:
     @classmethod
     def from_toml(cls, path: str) -> "MemoriaConfig":
         """Load configuration from a TOML file."""
-        try:
-            import tomli
-        except ImportError:
-            import tomllib as tomli
+        import tomllib
 
         with open(path, "rb") as f:
-            data = tomli.load(f)
+            data = tomllib.load(f)
 
         server = data.get("server", {})
         storage = data.get("storage", {})
