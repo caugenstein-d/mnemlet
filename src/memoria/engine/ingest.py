@@ -8,10 +8,11 @@ from memoria.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD
 class IngestEngine:
     """Handles memory ingestion: chunking, dedup, and storage."""
 
-    def __init__(self, db, chroma, embedder):
+    def __init__(self, db, chroma, embedder, vault=None):
         self.db = db
         self.chroma = chroma
         self.embedder = embedder
+        self.vault = vault
 
     def ingest(
         self,
@@ -58,6 +59,18 @@ class IngestEngine:
                     "created_at": db_result["created_at"],
                 },
             )
+
+            # Write to vault
+            if self.vault:
+                self.vault.write_memory(
+                    memory_id=memory_id,
+                    namespace=namespace,
+                    content=chunk,
+                    retention_score=db_result["retention_score"],
+                    importance=importance,
+                    created_at=db_result["created_at"],
+                    metadata=metadata,
+                )
 
             results.append(memory_id)
 

@@ -39,6 +39,14 @@ async def status(request: Request):
     }
 
 
+@router.get("/vault")
+async def vault_info(request: Request):
+    """Get vault path and file count."""
+    vault = request.app.state.vault
+    count = sum(1 for _ in vault.vault_path.rglob("*.md"))
+    return {"vault_path": str(vault.vault_path), "file_count": count}
+
+
 class DecayConfigRequest(BaseModel):
     lambda_: float = Field(default=0.01, ge=0.0, le=1.0, alias="lambda")
     purge_threshold: float = Field(default=0.05, ge=0.0, le=1.0)

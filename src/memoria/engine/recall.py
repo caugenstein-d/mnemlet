@@ -1,7 +1,8 @@
 """Recall pipeline: embed → hybrid search → filter → return."""
 
 from typing import Optional
-from memoria.constants import DEFAULT_TOP_N, MAX_TOP_N, HYBRID_BM25_WEIGHT, HYBRID_VECTOR_WEIGHT
+from memoria.constants import (DEFAULT_TOP_N, MAX_TOP_N, HYBRID_BM25_WEIGHT,
+                              HYBRID_VECTOR_WEIGHT, MAX_RECALL_TOKENS)
 from memoria.engine.decay import DecayEngine
 
 
@@ -29,6 +30,19 @@ class RecallEngine:
 
         merged = self._merge_results(vector_results, fts_results, limit)
         filtered = [m for m in merged if m["score"] >= min_score]
+
+        # Enforce recall token budget
+        total_tokens = 0
+        budgeted = []
+        for m in filtered:
+            tokens = self.embedder.count_tokens(m["content"])
+            if total_tokens + tokens <= MAX_RECALL_TOKENS:
+                budgeted.append(m)
+                total_tokens += tokens
+            else:
+                break  # Stop adding — budget exhausted
+
+        filtered = budgeted
 
         for m in filtered:
             self.db.record_interaction(m["id"], "recall", agent_id="api")

@@ -8,6 +8,7 @@ from memoria.config import MemoriaConfig
 from memoria.storage.sqlite import MemoriaDB
 from memoria.storage.chroma import MemoriaChroma
 from memoria.storage.embeddings import MemoriaEmbedding
+from memoria.storage.vault import VaultWriter
 from memoria.engine.ingest import IngestEngine
 from memoria.engine.recall import RecallEngine
 from memoria.engine.decay import DecayEngine
@@ -22,10 +23,12 @@ async def lifespan(app: FastAPI):
     app.state.db = MemoriaDB(config.sqlite_path)
     app.state.embedder = MemoriaEmbedding(cache_dir=config.embedding_cache_dir)
     app.state.chroma = MemoriaChroma(config.chroma_path, app.state.embedder)
+    app.state.vault = VaultWriter(config.vault_path)
     app.state.ingest_engine = IngestEngine(
         db=app.state.db,
         chroma=app.state.chroma,
         embedder=app.state.embedder,
+        vault=app.state.vault,
     )
     app.state.recall_engine = RecallEngine(
         db=app.state.db,
