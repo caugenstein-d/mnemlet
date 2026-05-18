@@ -225,3 +225,42 @@ class MemoriaDB:
             (memory_id, limit),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def get_decay_config(self, namespace: str) -> Optional[dict]:
+        """Get decay config for a namespace, or None."""
+        row = self.conn.execute(
+            "SELECT * FROM decay_configs WHERE namespace = ?", (namespace,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def set_decay_config(
+        self, namespace: str, lambda_: float = 0.01,
+        purge_threshold: float = 0.05, hard_delete_threshold: float = 0.01,
+        hard_delete_age_days: int = 90,
+    ) -> dict:
+        """Insert or update decay config for a namespace."""
+        now = datetime.now(timezone.utc).isoformat()
+        self.conn.execute(
+            """INSERT INTO decay_configs (namespace, lambda, purge_threshold,
+               hard_delete_threshold, hard_delete_age_days, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(namespace) DO UPDATE SET
+               lambda = excluded.lambda,
+               purge_threshold = excluded.purge_threshold,
+               hard_delete_threshold = excluded.hard_delete_threshold,
+               hard_delete_age_days = excluded.hard_delete_age_days,
+               updated_at = excluded.updated_at""",
+            (namespace, lambda_, purge_threshold, hard_delete_threshold, hard_delete_age_days, now),
+        )
+        self.conn.commit()
+        return dict(self.get_decay_config(namespace))
+
+    def get_active_memories_for_decay(self, limit: int = 1000) -> list[dict]:
+        """Get active memories that need decay processing, ordered by last_accessed_at ASC."""
+        rows = self.conn.execute(
+            """SELECT id, namespace, retention_score, last_accessed_at
+               FROM memories WHERE status = 'active'
+               ORDER BY last_accessed_at ASC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]

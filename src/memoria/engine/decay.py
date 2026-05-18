@@ -148,3 +148,39 @@ class DecayEngine:
             "hard_deleted": hard_deleted,
             "checked": len(cold_candidates) + len(hard_candidates),
         }
+
+    def decay_all_active(self, limit: int = 1000) -> dict:
+        """Apply decay to all active memories, using per-namespace config if available.
+
+        Returns: {processed, decayed, moved_to_cold, hard_deleted}
+        """
+        now = datetime.now(timezone.utc)
+        memories = self.db.get_active_memories_for_decay(limit)
+        processed = 0
+        decayed_count = 0
+
+        for mem in memories:
+            ns_config = self.db.get_decay_config(mem["namespace"])
+            lambda_ = ns_config["lambda"] if ns_config else DEFAULT_LAMBDA
+
+            last_accessed = datetime.fromisoformat(mem["last_accessed_at"])
+            days_elapsed = (now - last_accessed).total_seconds() / 86400.0
+
+            new_score = self.calculate_decay(
+                mem["retention_score"], days_elapsed, lambda_
+            )
+
+            if abs(new_score - mem["retention_score"]) > 0.0001:
+                self.db.update_score(mem["id"], new_score)
+                decayed_count += 1
+
+            processed += 1
+
+        purge_result = self.run_purge(dry_run=False)
+
+        return {
+            "processed": processed,
+            "decayed": decayed_count,
+            "moved_to_cold": purge_result["moved_to_cold"],
+            "hard_deleted": purge_result["hard_deleted"],
+        }

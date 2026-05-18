@@ -2,15 +2,17 @@
 
 from typing import Optional
 from memoria.constants import DEFAULT_TOP_N, MAX_TOP_N, HYBRID_BM25_WEIGHT, HYBRID_VECTOR_WEIGHT
+from memoria.engine.decay import DecayEngine
 
 
 class RecallEngine:
     """Handles memory retrieval with hybrid search."""
 
-    def __init__(self, db, chroma, embedder):
+    def __init__(self, db, chroma, embedder, decay_engine=None):
         self.db = db
         self.chroma = chroma
         self.embedder = embedder
+        self.decay_engine = decay_engine
 
     def recall(
         self,
@@ -30,6 +32,8 @@ class RecallEngine:
 
         for m in filtered:
             self.db.record_interaction(m["id"], "recall", agent_id="api")
+            if self.decay_engine:
+                self.decay_engine.boost_memory(m["id"], "recall", agent_id="api")
 
         return filtered[:limit]
 

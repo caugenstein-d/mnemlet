@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +10,7 @@ from memoria.storage.chroma import MemoriaChroma
 from memoria.storage.embeddings import MemoriaEmbedding
 from memoria.engine.ingest import IngestEngine
 from memoria.engine.recall import RecallEngine
+from memoria.engine.decay import DecayEngine
 from memoria.server.routes import ingest, recall, status
 
 
@@ -29,7 +31,26 @@ async def lifespan(app: FastAPI):
         chroma=app.state.chroma,
         embedder=app.state.embedder,
     )
+
+    async def decay_loop():
+        """Run decay processing every 6 hours."""
+        while True:
+            await asyncio.sleep(6 * 3600)  # 6 hours
+            try:
+                decay = DecayEngine(app.state.db)
+                result = decay.decay_all_active(limit=500)
+                print(f"[decay] processed={result['processed']} decayed={result['decayed']} "
+                      f"cold={result['moved_to_cold']} deleted={result['hard_deleted']}")
+            except Exception as e:
+                print(f"[decay] error: {e}")
+
+    task = asyncio.create_task(decay_loop())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 def create_app(config: MemoriaConfig = None) -> FastAPI:
