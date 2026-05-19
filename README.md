@@ -14,6 +14,7 @@ Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](htt
 [![Pi-Tested](https://img.shields.io/badge/pi--tested-RPi%205%2016GB-brightgreen)](https://www.raspberrypi.com/)
 [![Tests](https://img.shields.io/badge/tests-48%20passed-brightgreen)]()
 [![Demo](https://img.shields.io/badge/demo-asciinema-ff69b4)](scripts/demo.cast)
+[![Website](https://img.shields.io/badge/web-mnemlet.dev-22C55E)](https://christoph.github.io/mnemlet)
 
 ---
 
