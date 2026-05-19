@@ -3,23 +3,23 @@
 import tempfile
 from pathlib import Path
 import pytest
-from memoria.storage.sqlite import MemoriaDB
-from memoria.storage.chroma import MemoriaChroma
-from memoria.storage.embeddings import MemoriaEmbedding
-from memoria.engine.ingest import IngestEngine
+from engram.storage.sqlite import EngramDB
+from engram.storage.chroma import EngramChroma
+from engram.storage.embeddings import EngramEmbedding
+from engram.engine.ingest import IngestEngine
 
 
 @pytest.fixture(scope="module")
 def embedder():
-    return MemoriaEmbedding()
+    return EngramEmbedding()
 
 
 @pytest.fixture
 def engine(embedder):
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
-        db = MemoriaDB(base / "test.db")
-        chroma = MemoriaChroma(base / "chroma", embedder)
+        db = EngramDB(base / "test.db")
+        chroma = EngramChroma(base / "chroma", embedder)
         eng = IngestEngine(db=db, chroma=chroma, embedder=embedder)
         yield eng
 

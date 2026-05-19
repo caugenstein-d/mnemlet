@@ -1,4 +1,4 @@
-"""Default constants and thresholds for Memoria."""
+"""Default constants and thresholds for Engram."""
 
 # Token limits
 MAX_CHUNK_TOKENS = 3000

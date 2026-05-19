@@ -7,8 +7,8 @@ from chromadb.api.types import EmbeddingFunction, Embeddings
 from chromadb.config import Settings as ChromaSettings
 
 
-class _MemoriaEmbeddingFn(EmbeddingFunction):
-    """ChromaDB-compatible embedding function wrapping MemoriaEmbedding."""
+class _EngramEmbeddingFn(EmbeddingFunction):
+    """ChromaDB-compatible embedding function wrapping EngramEmbedding."""
 
     def __init__(self, embedder):
         self.embedder = embedder
@@ -17,7 +17,7 @@ class _MemoriaEmbeddingFn(EmbeddingFunction):
         return self.embedder.embed_batch(input)
 
 
-class MemoriaChroma:
+class EngramChroma:
     """ChromaDB client for vector storage and retrieval."""
 
     def __init__(self, persist_dir: Path, embedder):
@@ -26,14 +26,14 @@ class MemoriaChroma:
             path=str(persist_dir),
             settings=ChromaSettings(anonymized_telemetry=False),
         )
-        self._embedding_fn = _MemoriaEmbeddingFn(embedder)
+        self._embedding_fn = _EngramEmbeddingFn(embedder)
         self._collection = None
 
     @property
     def collection(self):
         """Lazy-load or create the collection."""
         if self._collection is None:
-            collection_name = "memoria_memories"
+            collection_name = "engram_memories"
             try:
                 self._collection = self.client.get_collection(
                     name=collection_name,

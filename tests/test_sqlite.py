@@ -3,7 +3,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from memoria.storage.sqlite import MemoriaDB
+from engram.storage.sqlite import EngramDB
 
 
 @pytest.fixture
@@ -11,7 +11,7 @@ def db():
     """Create a temporary database for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
-        database = MemoriaDB(db_path)
+        database = EngramDB(db_path)
         yield database
 
 

@@ -11,11 +11,11 @@ MODEL_FILENAME = "all-MiniLM-L6-v2.onnx"
 EMBEDDING_DIM = 384
 
 
-class MemoriaEmbedding:
+class EngramEmbedding:
     """Local embedding model using onnxruntime."""
 
     def __init__(self, cache_dir: Optional[Path] = None) -> None:
-        self.cache_dir = cache_dir or Path.home() / ".memoria" / "models"
+        self.cache_dir = cache_dir or Path.home() / ".engram" / "models"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.model_path = self.cache_dir / MODEL_FILENAME
         self._model = None

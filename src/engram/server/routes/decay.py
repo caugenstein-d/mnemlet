@@ -18,7 +18,7 @@ class DecayRunRequest(BaseModel):
 @router.post("/decay/run")
 async def run_decay(req: DecayRunRequest, request: Request):
     """Manually trigger decay processing and purging."""
-    from memoria.engine.decay import DecayEngine
+    from engram.engine.decay import DecayEngine
 
     decay = DecayEngine(request.app.state.db)
 

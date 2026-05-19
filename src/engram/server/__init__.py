@@ -1,0 +1,1 @@
+"""Engram HTTP server — FastAPI application and routes."""

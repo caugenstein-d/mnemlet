@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from memoria.server.app import create_app
-from memoria.config import MemoriaConfig
+from engram.server.app import create_app
+from engram.config import EngramConfig
 
 
 @pytest.fixture
 async def client():
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
-        config = MemoriaConfig(
+        config = EngramConfig(
             data_dir=base,
-            sqlite_path=base / "memoria.db",
+            sqlite_path=base / "engram.db",
             chroma_path=base / "chroma",
             embedding_cache_dir=base / "models",
         )

@@ -4,26 +4,26 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from memoria.config import MemoriaConfig
-from memoria.storage.sqlite import MemoriaDB
-from memoria.storage.chroma import MemoriaChroma
-from memoria.storage.embeddings import MemoriaEmbedding
-from memoria.storage.vault import VaultWriter
-from memoria.engine.ingest import IngestEngine
-from memoria.engine.recall import RecallEngine
-from memoria.engine.decay import DecayEngine
-from memoria.engine.sleep import SleepEngine
-from memoria.server.routes import decay, ingest, recall, sleep, status
-from memoria.server.mcp_server import create_mcp_server
+from engram.config import EngramConfig
+from engram.storage.sqlite import EngramDB
+from engram.storage.chroma import EngramChroma
+from engram.storage.embeddings import EngramEmbedding
+from engram.storage.vault import VaultWriter
+from engram.engine.ingest import IngestEngine
+from engram.engine.recall import RecallEngine
+from engram.engine.decay import DecayEngine
+from engram.engine.sleep import SleepEngine
+from engram.server.routes import decay, ingest, recall, sleep, status
+from engram.server.mcp_server import create_mcp_server
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     config = app.state.config
-    app.state.db = MemoriaDB(config.sqlite_path)
-    app.state.embedder = MemoriaEmbedding(cache_dir=config.embedding_cache_dir)
-    app.state.chroma = MemoriaChroma(config.chroma_path, app.state.embedder)
+    app.state.db = EngramDB(config.sqlite_path)
+    app.state.embedder = EngramEmbedding(cache_dir=config.embedding_cache_dir)
+    app.state.chroma = EngramChroma(config.chroma_path, app.state.embedder)
     app.state.vault = VaultWriter(config.vault_path)
     app.state.ingest_engine = IngestEngine(
         db=app.state.db,
@@ -84,13 +84,13 @@ async def lifespan(app: FastAPI):
         pass
 
 
-def create_app(config: MemoriaConfig = None) -> FastAPI:
+def create_app(config: EngramConfig = None) -> FastAPI:
     """Create and configure the FastAPI application."""
     if config is None:
-        config = MemoriaConfig()
+        config = EngramConfig()
 
     app = FastAPI(
-        title="Memoria",
+        title="Engram",
         description="Self-hosted, brain-inspired memory engine for AI agents.",
         version="0.1.0",
         lifespan=lifespan,

@@ -3,14 +3,14 @@ host = "127.0.0.1"
 port = 4050
 
 [storage]
-data_dir = "~/.memoria"
-sqlite_path = "~/.memoria/memoria.db"
-chroma_path = "~/.memoria/chroma"
-vault_path = "~/.memoria/vault"
+data_dir = "~/.engram"
+sqlite_path = "~/.engram/engram.db"
+chroma_path = "~/.engram/chroma"
+vault_path = "~/.engram/vault"
 
 [embedding]
 model = "all-MiniLM-L6-v2"
-cache_dir = "~/.memoria/models"
+cache_dir = "~/.engram/models"
 
 [llm]
 enabled = false

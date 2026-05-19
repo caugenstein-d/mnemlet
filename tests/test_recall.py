@@ -3,24 +3,24 @@
 import tempfile
 from pathlib import Path
 import pytest
-from memoria.storage.sqlite import MemoriaDB
-from memoria.storage.chroma import MemoriaChroma
-from memoria.storage.embeddings import MemoriaEmbedding
-from memoria.engine.ingest import IngestEngine
-from memoria.engine.recall import RecallEngine
+from engram.storage.sqlite import EngramDB
+from engram.storage.chroma import EngramChroma
+from engram.storage.embeddings import EngramEmbedding
+from engram.engine.ingest import IngestEngine
+from engram.engine.recall import RecallEngine
 
 
 @pytest.fixture(scope="module")
 def embedder():
-    return MemoriaEmbedding()
+    return EngramEmbedding()
 
 
 @pytest.fixture
 def engine(embedder):
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
-        db = MemoriaDB(base / "test.db")
-        chroma = MemoriaChroma(base / "chroma", embedder)
+        db = EngramDB(base / "test.db")
+        chroma = EngramChroma(base / "chroma", embedder)
         ingest = IngestEngine(db=db, chroma=chroma, embedder=embedder)
         recall = RecallEngine(db=db, chroma=chroma, embedder=embedder)
         ingest.ingest("User prefers dark mode in editors", namespace="preferences", importance=0.9)

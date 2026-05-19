@@ -1,11 +1,11 @@
-"""MemoriaClient — Python SDK for the Memoria Memory Engine."""
+"""EngramClient — Python SDK for the Engram Memory Engine."""
 
 from typing import Optional
 import httpx
 
 
-class MemoriaClient:
-    """Client for the Memoria Memory Engine REST API."""
+class EngramClient:
+    """Client for the Engram Memory Engine REST API."""
 
     def __init__(self, base_url: str = "http://localhost:4050"):
         self.base_url = base_url.rstrip("/")

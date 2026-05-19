@@ -2,13 +2,13 @@
 
 import numpy as np
 import pytest
-from memoria.storage.embeddings import MemoriaEmbedding
+from engram.storage.embeddings import EngramEmbedding
 
 
 @pytest.fixture(scope="module")
 def embedder():
     """Create an embedding model (expensive, so module-scoped)."""
-    return MemoriaEmbedding()
+    return EngramEmbedding()
 
 
 def test_embed_single_text(embedder):

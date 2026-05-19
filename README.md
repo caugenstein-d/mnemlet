@@ -1,4 +1,4 @@
-# 🧠 Memoria
+# 🧠 Engram
 
 **The self-hosted memory engine that learns what matters, forgets the rest — and thinks while you sleep.**
 
@@ -7,14 +7,14 @@
 
 ---
 
-## Why Memoria?
+## Why Engram?
 
 Your AI agents forget everything between sessions. Existing memory systems either:
 - Store everything forever (growing unboundedly)
 - Cost money per API call (cloud-dependent)
 - Only work with one agent (fragmented)
 
-**Memoria is different.** It's a self-hosted, brain-inspired memory engine that:
+**Engram is different.** It's a self-hosted, brain-inspired memory engine that:
 
 - 🧠 **Forgets intelligently** — Exponential time-decay + interaction-weighting. What you use stays sharp. What you ignore fades.
 - 🌐 **Works with all your agents** — MCP-native. OpenWebUI, OpenClaw, Claude Code, Cursor, any MCP client.
@@ -30,13 +30,13 @@ Your AI agents forget everything between sessions. Existing memory systems eithe
 ### Install
 
 ```bash
-pip install memoria
+pip install engram
 ```
 
 ### Start the server
 
 ```bash
-memoria serve
+engram serve
 # → http://localhost:4050
 ```
 
@@ -59,9 +59,9 @@ curl -X POST http://localhost:4050/api/v1/recall \
 ### Python SDK
 
 ```python
-from memoria.client import MemoriaClient
+from engram.client import EngramClient
 
-c = MemoriaClient()
+c = EngramClient()
 c.ingest("Hello world")
 results = c.recall("Hello")
 print(results)
@@ -72,7 +72,7 @@ print(results)
 Add to any MCP client config:
 
 ```json
-{"mcpServers": {"memoria": {"url": "http://localhost:4050/mcp"}}}
+{"mcpServers": {"engram": {"url": "http://localhost:4050/mcp"}}}
 ```
 
 ---
@@ -95,7 +95,7 @@ Interactions boost scores: recall +0.15, update +0.20, create +0.10, reference +
 
 ### The Sleep Engine
 
-When no API calls occur for 2+ hours, Memoria enters consolidation:
+When no API calls occur for 2+ hours, Engram enters consolidation:
 
 1. **Dedup** — Merge near-duplicate memories from today
 2. **Rescore** — Apply time-decay and purge stale memories
@@ -107,7 +107,7 @@ All tasks run sequentially, locally, with zero API costs.
 ### Inspectable Vault
 
 ```
-~/.memoria/vault/
+~/.engram/vault/
   preferences/
     2026-05/
       a1b2c3d4.md      ← Open in Obsidian!
@@ -142,13 +142,13 @@ Every memory is a Markdown file with YAML frontmatter. Full transparency.
 ## Configuration
 
 ```toml
-# memoria.toml
+# engram.toml
 [server]
 host = "127.0.0.1"
 port = 4050
 
 [storage]
-data_dir = "~/.memoria"
+data_dir = "~/.engram"
 
 [llm]
 enabled = false           # Enable for Gemma 4 E2B via Ollama
@@ -165,7 +165,7 @@ base_url = "http://localhost:8888"
 
 ## Raspberry Pi
 
-Memoria runs on a Raspberry Pi 5 (16GB recommended for full feature set):
+Engram runs on a Raspberry Pi 5 (16GB recommended for full feature set):
 
 | Mode | RAM |
 |---|---|
@@ -175,9 +175,9 @@ Memoria runs on a Raspberry Pi 5 (16GB recommended for full feature set):
 
 ---
 
-## What Makes Memoria Different
+## What Makes Engram Different
 
-| | MemPalace | Mem0 | NeoCortex | Dakera | **Memoria** |
+| | MemPalace | Mem0 | NeoCortex | Dakera | **Engram** |
 |---|---|---|---|---|---|
 | Self-hosted | ✅ | ⚠️ | ❌ | ✅ | ✅ |
 | Decay | ❌ | ❌ | ✅ | ✅ | ✅ **deep** |

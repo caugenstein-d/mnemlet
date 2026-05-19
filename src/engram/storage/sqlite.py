@@ -1,4 +1,4 @@
-"""SQLite database layer for Memoria metadata, FTS, and graph storage."""
+"""SQLite database layer for Engram metadata, FTS, and graph storage."""
 
 import sqlite3
 import uuid
@@ -83,12 +83,12 @@ END;
 """
 
 
-class MemoriaDB:
-    """SQLite database for Memoria.
+class EngramDB:
+    """SQLite database for Engram.
 
     Note: This class is NOT thread-safe for writes. Use a single-threaded access pattern
     (which FastAPI's async event loop provides natively). For multi-threaded access,
-    instantiate with `MemoriaDB(path)`, then set `db._lock = threading.Lock()` and wrap
+    instantiate with `EngramDB(path)`, then set `db._lock = threading.Lock()` and wrap
     write operations.
     """
 

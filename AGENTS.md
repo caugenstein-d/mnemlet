@@ -1,6 +1,6 @@
-# Memoria — Agent Instructions
+# Engram — Agent Instructions
 
-Project: Memoria
+Project: Engram
 Phase: 1 — Core Engine
 Language: Python 3.12+
 Testing: pytest with TDD
