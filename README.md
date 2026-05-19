@@ -6,6 +6,14 @@ This is a **values** choice, not a feature checklist. If that resonates, welcome
 
 Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](https://reddit.com/r/LocalLLaMA) — people running AI on Pis, homelabs, old laptops, and local servers.
 
+> **Pronounced** `/ˈnɛm.lɛt/` *("NEM-let")* — from Greek *mnēmē* (memory) + *-let* (diminutive: small). The CLI command is `mnemlet` (ASCII), the project name is **Mnémlet**.
+
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/christoph/mnemlet)
+[![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Pi-Tested](https://img.shields.io/badge/pi--tested-RPi%205%2016GB-brightgreen)](https://www.raspberrypi.com/)
+[![Tests](https://img.shields.io/badge/tests-48%20passed-brightgreen)]()
+
 ---
 
 ## What Mnémlet Does
@@ -28,7 +36,7 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 
 No checkmark bingo. Here's where Mnémlet shines, and where it doesn't.
 
-| | Mnémlet | Mem0 | MemPalace | Engram (Go) | NeoCortex |
+| | [Mnémlet](https://github.com/christoph/mnemlet) | [Mem0](https://github.com/mem0ai/mem0) | [MemPalace](https://github.com/MemPalace/mempalace) | [Engram](https://github.com/Gentleman-Programming/engram) | [NeoCortex](https://github.com/tinyhumansai/neocortex) |
 |---|---|---|---|---|---|
 | **Self-hosted** | ✅ | ⚠️ (platform) | ✅ | ✅ | ❌ (API-only) |
 | **Decay / Forgetting** | ✅ (deep) | ❌ | ❌ | ❌ | ✅ |
@@ -41,7 +49,6 @@ No checkmark bingo. Here's where Mnémlet shines, and where it doesn't.
 | **MCP tools** | 8 | ~10 | 29 | 19 | ❌ (API) |
 | **Language** | Python | Python | Python | Go | HTTP API |
 | **License** | MIT | Apache 2.0 | MIT | MIT | MIT |
-| **GitHub stars** | 0 | 48k | 52k | 3.6k | 193 |
 | **Pi-friendly RAM** | ✅ (450 MB) | ❌ | ✅ | ✅ | ❌ |
 
 If your priority is cloud sync, a polished dashboard, or an ecosystem with 50k stars — use Mem0 or MemPalace. They're great at those things.
@@ -121,7 +128,21 @@ score(t) = score₀ × e^(-λ × t)
 
 Interactions boost retention: recall +0.15, update +0.20, create +0.10, reference +0.08.
 
-When scores fall below configurable thresholds, memories move to cold storage or get purged. What you use stays sharp. What you ignore fades.
+**What this means in practice:**
+
+> Your agent remembers that you prefer dark mode and use Python → these facts have
+> high retention, decaying slowly (~2 year half-life). They stay sharp across months
+> of sessions without you ever re-stating them.
+>
+> Your agent quickly forgets that you asked about today's weather or checked a
+> one-off API syntax → these are transient memories that fade within days (~1.4 day
+> half-life). You never have to manually "clean up" stale context.
+>
+> When a preference changes — you switch from tabs to spaces — the new memory
+> gets a +0.20 update boost, while the old one decays below threshold and moves
+> to cold storage. The system self-corrects.
+
+When scores fall below configurable thresholds, memories move to cold storage or get purged.
 
 ### The Sleep Engine
 
