@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impressum — Mnémlet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0F172A;
+            --text: #F8FAFC;
+            --text-muted: #94A3B8;
+            --accent: #38BDF8;
+            --border: #1E293B;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+            line-height: 1.7;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 2rem 1.5rem;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .back-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            flex: 1;
+            padding: 3rem 1.5rem;
+        }
+
+        h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        p {
+            margin-bottom: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .address-block p {
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+
+        .note {
+            background: rgba(56, 189, 248, 0.06);
+            border-left: 3px solid var(--accent);
+            padding: 1rem 1.25rem;
+            border-radius: 0 4px 4px 0;
+            margin-top: 2.5rem;
+        }
+
+        .note p {
+            color: var(--text);
+            margin-bottom: 0;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 2rem 1.5rem;
+            text-align: center;
+        }
+
+        footer p {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <a href="/" class="back-link">&larr; Zurück zur Startseite</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>Impressum</h1>
+
+            <h2>Angaben gemäß § 5 TMG</h2>
+
+            <div class="address-block">
+                <p>[Vorname Nachname]</p>
+                <p>[Straße Hausnummer]</p>
+                <p>[PLZ Ort]</p>
+            </div>
+
+            <h2>Kontakt</h2>
+            <p>E-Mail: <a href="mailto:christoph@augenstein.consulting">christoph@augenstein.consulting</a></p>
+
+            <h2>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
+            <div class="address-block">
+                <p>[Vorname Nachname]</p>
+                <p>[Straße Hausnummer]</p>
+                <p>[PLZ Ort]</p>
+            </div>
+
+            <div class="note">
+                <p>Als Open-Source-Projekt verfolgt Mnémlet keine kommerziellen Zwecke. Diese Seite dient ausschließlich der Projekt-Dokumentation.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Mnémlet — Open-Source-Projekt</p>
+        </div>
+    </footer>
+</body>
+</html>

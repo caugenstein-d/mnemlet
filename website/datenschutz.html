@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datenschutzerklärung — Mnémlet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0F172A;
+            --text: #F8FAFC;
+            --text-muted: #94A3B8;
+            --accent: #38BDF8;
+            --border: #1E293B;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+            line-height: 1.7;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 2rem 1.5rem;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .back-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            flex: 1;
+            padding: 3rem 1.5rem;
+        }
+
+        h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        p {
+            margin-bottom: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        ul {
+            color: var(--text-muted);
+            padding-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        li {
+            margin-bottom: 0.375rem;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 2rem 1.5rem;
+            text-align: center;
+        }
+
+        footer p {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <a href="/" class="back-link">&larr; Zurück zur Startseite</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>Datenschutzerklärung</h1>
+
+            <p>Der Schutz Ihrer Daten ist uns wichtig. Diese Datenschutzerklärung informiert Sie über den Umgang mit personenbezogenen Daten auf dieser Website.</p>
+
+            <h2>Keine Erhebung personenbezogener Daten</h2>
+            <p>Diese Website ist eine rein statische Projekt-Dokumentation. Es werden keine personenbezogenen Daten erhoben, verarbeitet oder gespeichert:</p>
+            <ul>
+                <li>Keine Benutzerkonten oder Registrierungen</li>
+                <li>Keine Kontaktformulare</li>
+                <li>Keine Kommentarfunktionen</li>
+                <li>Keine Newsletter oder Benachrichtigungen</li>
+            </ul>
+            <p>Beim Aufruf der Website können durch den Hosting-Anbieter (siehe unten) technisch bedingt Server-Logdateien erstellt werden, die unter anderem IP-Adressen enthalten können. Dies liegt außerhalb unseres Einflussbereichs und entspricht dem üblichen Betrieb von Webservern.</p>
+
+            <h2>Keine Cookies</h2>
+            <p>Diese Website setzt keine Cookies. Es werden keinerlei Daten im Browser des Besuchers gespeichert.</p>
+
+            <h2>Keine Analyse-Tools</h2>
+            <p>Es kommen keine Webanalyse-Tools (wie Google Analytics, Matomo o.&nbsp;Ä.), keine Tracking-Pixel und keine externen Schriftarten- oder Skript-Dienste zum Einsatz, die Besucherdaten erfassen könnten. Die auf dieser Seite verwendeten Schriftarten werden über Google Fonts eingebunden — allerdings ohne Tracking, da sie selbst gehostet werden.</p>
+
+            <h2>Hosting</h2>
+            <p>Diese Website wird über <strong>GitHub Pages</strong> bereitgestellt. Weitere Informationen zum Datenschutz von GitHub finden Sie in der Datenschutzerklärung von GitHub: <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub General Privacy Statement</a>.</p>
+
+            <h2>Kontakt</h2>
+            <p>Bei Fragen zum Datenschutz können Sie sich jederzeit per E-Mail an uns wenden:</p>
+            <p><a href="mailto:christoph@augenstein.consulting">christoph@augenstein.consulting</a></p>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Mnémlet — Open-Source-Projekt</p>
+        </div>
+    </footer>
+</body>
+</html>
