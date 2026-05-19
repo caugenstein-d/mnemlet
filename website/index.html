@@ -4,403 +4,336 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mnémlet — Brain-inspired memory for your self-hosted AI stack</title>
-<meta name="description" content="Self-hosted memory engine for AI agents. Exponential decay, sleep consolidation, Markdown vault. Runs on a Pi. No cloud. No API keys.">
-<meta property="og:image" content="og-image.svg">
-
+<meta name="description" content="Self-hosted memory engine for AI agents. Exponential decay, sleep consolidation, Markdown vault. Runs on a Pi. No cloud.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#0F172A',
+          card: '#1E293B',
+          cta: '#22C55E',
+          text: '#F8FAFC',
+          muted: '#94A3B8',
+          border: '#334155',
+        },
+        fontFamily: {
+          mono: ['"JetBrains Mono"', 'monospace'],
+          sans: ['"IBM Plex Sans"', 'sans-serif'],
+        },
+      }
+    }
+  }
+</script>
 <style>
-:root {
-  --bg: #0F172A;
-  --card: #1E293B;
-  --cta: #22C55E;
-  --cta-dim: #166534;
-  --text: #F8FAFC;
-  --muted: #94A3B8;
-  --border: #334155;
-  --glow: rgba(34,197,94,0.15);
-}
-
-*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-html { scroll-behavior:smooth; }
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-}
-
-/* ── Scanlines Overlay ── */
+/* ── Scanlines ── */
 body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.03) 2px,
-    rgba(0,0,0,0.03) 4px
-  );
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 4px);
 }
-
-/* ── Animated Background Dots ── */
-.bg-dots {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.04;
-  background-image: radial-gradient(var(--cta) 1px, transparent 1px);
-  background-size: 28px 28px;
-  animation: dotPulse 8s ease-in-out infinite alternate;
-}
-@keyframes dotPulse {
-  0% { opacity: 0.03; background-size: 28px 28px; }
-  100% { opacity: 0.06; background-size: 30px 30px; }
-}
-
 /* ── Glow Orbs ── */
 .glow-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  pointer-events: none;
+  position: absolute; border-radius: 50%; filter: blur(100px); pointer-events: none;
 }
-.glow-orb.green {
-  width: 500px; height: 500px;
-  background: var(--cta);
-  opacity: 0.06;
-  top: -150px; right: -100px;
-  animation: orbFloat 12s ease-in-out infinite alternate;
-}
-.glow-orb.blue {
-  width: 400px; height: 400px;
-  background: #38BDF8;
-  opacity: 0.04;
-  bottom: -100px; left: -100px;
-  animation: orbFloat 15s ease-in-out infinite alternate-reverse;
-}
-@keyframes orbFloat {
-  0% { transform: translate(0,0) scale(1); }
-  50% { transform: translate(30px,-20px) scale(1.1); }
-  100% { transform: translate(-20px,10px) scale(0.95); }
-}
-
+.glow-orb.g1 { width:500px; height:500px; background:#22C55E; opacity:0.04; top:-150px; right:-100px; }
+.glow-orb.g2 { width:400px; height:400px; background:#38BDF8; opacity:0.03; bottom:-100px; left:-100px; }
 /* ── Cursor Blink ── */
-.cursor-blink { animation: blink 1s step-end infinite; }
+.blink { animation: blink 1s step-end infinite; }
 @keyframes blink { 50% { opacity:0; } }
-
-/* ── Terminal Window ── */
-.terminal {
-  background: #0B1120;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 0 40px rgba(34,197,94,0.05), 0 20px 60px rgba(0,0,0,0.4);
-}
-.terminal-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(51,65,85,0.5);
-  background: rgba(30,41,59,0.5);
-}
-.terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
-.terminal-dot.red { background: #EF4444; opacity: 0.7; }
-.terminal-dot.yellow { background: #EAB308; opacity: 0.7; }
-.terminal-dot.green { background: #22C55E; opacity: 0.7; }
-.terminal-body { padding: 16px 20px; overflow-x: auto; }
-
-/* ── Feature Cards ── */
-.feature-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 28px;
-  transition: all 0.2s;
-}
-.feature-card:hover {
-  border-color: rgba(34,197,94,0.4);
-  box-shadow: 0 4px 24px var(--glow);
-  transform: translateY(-2px);
-}
-.feature-icon {
-  width: 48px; height: 48px;
-  background: rgba(34,197,94,0.08);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-  transition: background 0.2s;
-}
-.feature-card:hover .feature-icon { background: rgba(34,197,94,0.15); }
-
-/* ── Table ── */
-.comparison-table th, .comparison-table td { padding: 12px 16px; }
-.comparison-table tbody tr:hover { background: rgba(30,41,59,0.3); }
-
-/* ── Button Styles ── */
-.btn-primary {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 12px 24px;
-  background: var(--cta);
-  color: var(--bg);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.875rem; font-weight: 600;
-  border-radius: 8px;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-.btn-primary:hover { background: #16A34A; box-shadow: 0 0 20px var(--glow); }
-.btn-secondary {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 12px 24px;
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.875rem;
-  border-radius: 8px;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-.btn-secondary:hover { border-color: var(--cta); color: var(--cta); }
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-/* ── Responsive ── */
-.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.section { padding: 80px 0; }
-@media (max-width: 768px) { .section { padding: 48px 0; } }
+.hover-green:hover { color: #22C55E !important; }
 </style>
 </head>
-<body>
+<body class="bg-bg text-text font-sans antialiased">
 
-<!-- ═══════════ HERO ═══════════ -->
-<section class="min-h-screen flex items-center relative overflow-hidden">
-  <div class="bg-dots"></div>
-  <div class="glow-orb green"></div>
-  <div class="glow-orb blue"></div>
-
-  <div class="container relative z-10 py-24">
-    <div class="max-w-3xl mx-auto text-center">
-
-      <!-- Brain Graphic -->
-      <div class="mb-8 inline-block relative">
-        <svg width="80" height="80" viewBox="0 0 80 80" class="opacity-80">
-          <defs>
-            <radialGradient id="brainGlow"><stop offset="0%" stop-color="#22C55E" stop-opacity="0.4"/><stop offset="100%" stop-color="#22C55E" stop-opacity="0"/></radialGradient>
-          </defs>
-          <circle cx="40" cy="40" r="38" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.3">
-            <animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="30s" repeatCount="indefinite"/>
-          </circle>
-          <circle cx="40" cy="40" r="28" fill="none" stroke="#22C55E" stroke-width="1" opacity="0.2">
-            <animateTransform attributeName="transform" type="rotate" from="360 40 40" to="0 40 40" dur="20s" repeatCount="indefinite"/>
-          </circle>
-          <text x="40" y="46" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="28" fill="#22C55E" font-weight="700">🧠</text>
-        </svg>
-      </div>
-
-      <h1 class="font-mono text-5xl md:text-7xl font-bold tracking-tight mb-3" style="font-family:'JetBrains Mono',monospace;">
-        Mn<span style="color:var(--cta);">é</span>mlet
-      </h1>
-
-      <p class="text-xl md:text-2xl text-muted mb-2" style="font-family:'JetBrains Mono',monospace;">
-        Learn what matters. Forget the rest.
-      </p>
-      <p class="text-base text-muted/60 mb-10 max-w-lg mx-auto" style="font-family:'IBM Plex Sans',sans-serif;">
-        Brain-inspired memory for your self-hosted AI stack.<br>
-        Runs on a Pi. No cloud. No API keys.
-        <span class="cursor-blink text-cta">█</span>
-      </p>
-
-      <div class="flex flex-col sm:flex-row gap-3 justify-center mb-14">
-        <a href="#quickstart" class="btn-primary">▶ Quickstart</a>
-        <a href="https://github.com/christoph/mnemlet" class="btn-secondary">GitHub ↗</a>
-      </div>
-
-      <!-- Hero Terminal -->
-      <div class="terminal max-w-lg mx-auto text-left">
-        <div class="terminal-header">
-          <div class="terminal-dot red"></div>
-          <div class="terminal-dot yellow"></div>
-          <div class="terminal-dot green"></div>
-          <span class="font-mono text-xs text-muted/40 ml-2">terminal — mnemlet serve</span>
+<!-- Hero -->
+<section class="min-h-screen flex flex-col items-center justify-center px-6 py-24 text-center relative overflow-hidden">
+  <div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(#22C55E 1px, transparent 1px); background-size: 32px 32px;"></div>
+  <div class="glow-orb g1"></div>
+  <div class="glow-orb g2"></div>
+  <div class="relative z-10 max-w-3xl mx-auto">
+    <div class="mb-6">
+      <svg width="80" height="80" viewBox="0 0 80 80" class="opacity-90">
+        <circle cx="40" cy="40" r="38" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.3"><animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="30s" repeatCount="indefinite"/></circle>
+        <circle cx="40" cy="40" r="28" fill="none" stroke="#22C55E" stroke-width="1" opacity="0.2"><animateTransform attributeName="transform" type="rotate" from="360 40 40" to="0 40 40" dur="20s" repeatCount="indefinite"/></circle>
+        <text x="40" y="46" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="24" fill="#22C55E" font-weight="700">🧠</text>
+      </svg>
+    </div>
+    <h1 class="font-mono text-5xl md:text-7xl font-bold tracking-tight mb-4">Mnémlet</h1>
+    <p class="text-xl md:text-2xl text-muted font-sans mb-3">Brain-inspired memory for your self-hosted AI stack</p>
+    <p class="text-base md:text-lg text-muted/70 font-sans mb-10 max-w-xl mx-auto">Runs on a Pi. No cloud. No API keys. Your data stays on your hardware.</p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+      <a href="#quickstart" class="inline-flex items-center justify-center px-6 py-3 bg-cta text-bg font-mono font-semibold rounded-lg hover:bg-cta/90 transition-colors cursor-pointer text-sm tracking-wide">Quickstart →</a>
+      <a href="https://github.com/christoph/mnemlet" class="inline-flex items-center justify-center px-6 py-3 border border-border text-text font-mono rounded-lg hover:border-cta/50 hover:text-cta transition-colors cursor-pointer text-sm tracking-wide">GitHub ↗</a>
+    </div>
+    <div class="bg-[#0B1120] border border-border rounded-lg p-4 max-w-lg mx-auto text-left shadow-2xl">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="flex gap-1.5">
+          <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
         </div>
-        <div class="terminal-body">
-          <pre class="font-mono text-xs md:text-sm leading-6" style="font-family:'JetBrains Mono',monospace;"><span style="color:var(--cta)">$</span> <span style="color:var(--text)">mnemlet serve</span>
-<span style="color:var(--muted)">╭──────────────────────────────────────────╮</span>
-<span style="color:var(--muted)">│</span>  🧠 <span style="color:var(--text)">Mnémlet v0.1.0</span>                        <span style="color:var(--muted)">│</span>
-<span style="color:var(--muted)">│</span>  <span style="color:var(--muted)">Storage</span>  → <span style="color:var(--text)">~/.mnemlet</span>                   <span style="color:var(--muted)">│</span>
-<span style="color:var(--muted)">│</span>  <span style="color:var(--muted)">API</span>      → <span style="color:var(--cta)">http://127.0.0.1:4050</span>        <span style="color:var(--muted)">│</span>
-<span style="color:var(--muted)">│</span>  <span style="color:var(--muted)">MCP</span>      → <span style="color:var(--muted)">http://127.0.0.1:4050/mcp</span>    <span style="color:var(--muted)">│</span>
-<span style="color:var(--muted)">╰──────────────────────────────────────────╯</span>
-<span style="color:var(--cta)">$</span> <span class="cursor-blink">█</span></pre>
-        </div>
+        <span class="font-mono text-xs text-muted/50 ml-2">terminal — mnemlet serve</span>
       </div>
+      <pre class="font-mono text-xs md:text-sm text-cta overflow-x-auto"><span class="text-muted/50">$</span> mnemlet serve
+<span class="text-muted/50">╭──────────────────────────────────────────╮</span>
+<span class="text-muted/50">│</span>  🧠 Mnémlet v0.1.0                      <span class="text-muted/50">│</span>
+<span class="text-muted/50">│</span>  Storage  → ~/.mnemlet                   <span class="text-muted/50">│</span>
+<span class="text-muted/50">│</span>  API      → http://127.0.0.1:4050        <span class="text-muted/50">│</span>
+<span class="text-muted/50">│</span>  MCP      → http://127.0.0.1:4050/mcp    <span class="text-muted/50">│</span>
+<span class="text-muted/50">│</span>  LLM      → disabled                     <span class="text-muted/50">│</span>
+<span class="text-muted/50">│</span>  Search   → disabled                     <span class="text-muted/50">│</span>
+<span class="text-muted/50">╰──────────────────────────────────────────╯</span>
+<span class="text-cta">$</span> <span class="blink">█</span></pre>
+    </div>
+  </div>
+  <div class="absolute bottom-8 animate-bounce opacity-30">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+  </div>
+</section>
 
+<!-- Features -->
+<section class="py-24 px-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- Feature 1 -->
+      <div class="bg-card border border-border rounded-xl p-8 hover:border-cta/30 transition-colors group">
+        <div class="w-14 h-14 bg-cta/10 rounded-lg flex items-center justify-center mb-6 group-hover:bg-cta/20 transition-colors">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
+            <path d="M12 6v6l4 2"/>
+            <path d="M4.93 15.07l2.83 2.83M2 12h2M12 2v2M15.07 4.93l2.83 2.83"/>
+          </svg>
+        </div>
+        <h3 class="font-mono font-semibold text-lg mb-3 text-text">Forgets Intelligently</h3>
+        <p class="font-sans text-muted/80 leading-relaxed">Exponential decay + interaction-weighting. What you use stays sharp. What you ignore fades. No manual cleanup.</p>
+      </div>
+      <!-- Feature 2 -->
+      <div class="bg-card border border-border rounded-xl p-8 hover:border-cta/30 transition-colors group">
+        <div class="w-14 h-14 bg-cta/10 rounded-lg flex items-center justify-center mb-6 group-hover:bg-cta/20 transition-colors">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+        <h3 class="font-mono font-semibold text-lg mb-3 text-text">Thinks While You Sleep</h3>
+        <p class="font-sans text-muted/80 leading-relaxed">Night consolidation: dedup, rescore, cluster, morning briefing. All local, zero API costs. Like REM sleep for your agent.</p>
+      </div>
+      <!-- Feature 3 -->
+      <div class="bg-card border border-border rounded-xl p-8 hover:border-cta/30 transition-colors group">
+        <div class="w-14 h-14 bg-cta/10 rounded-lg flex items-center justify-center mb-6 group-hover:bg-cta/20 transition-colors">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <h3 class="font-mono font-semibold text-lg mb-3 text-text">Inspectable Vault</h3>
+        <p class="font-sans text-muted/80 leading-relaxed">Every memory as a Markdown file. <code class="font-mono text-xs bg-bg px-1.5 py-0.5 rounded text-cta/80">cat ~/.mnemlet/vault/**/*.md</code>. Open in Obsidian. No black box.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════ FEATURES ═══════════ -->
-<section class="section">
-  <div class="container">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><polyline points="12 6 12 12 16 14"/></svg>
+<!-- Demo -->
+<section class="py-24 px-6">
+  <div class="max-w-4xl mx-auto">
+    <h2 class="font-mono text-3xl md:text-4xl font-bold text-center mb-4">See It Work</h2>
+    <p class="text-muted/70 text-center mb-10 font-sans">Full ingest → recall → sleep → vault cycle from the terminal.</p>
+    <div class="bg-[#0B1120] border border-border rounded-xl overflow-hidden shadow-2xl">
+      <div class="flex items-center gap-2 px-5 py-3 border-b border-border/50">
+        <div class="flex gap-1.5">
+          <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
         </div>
-        <h3 class="font-bold text-lg mb-2" style="font-family:'JetBrains Mono',monospace;">Forgets Intelligently</h3>
-        <p class="text-muted/80 text-sm leading-relaxed">Exponential decay + interaction-weighting. Preferences last years. Daily chat fades in days. What you use stays sharp. What you ignore disappears. No manual cleanup.</p>
+        <span class="font-mono text-xs text-muted/40 ml-2">~/mnemlet — bash</span>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/><circle cx="12" cy="12" r="3"/></svg>
-        </div>
-        <h3 class="font-bold text-lg mb-2" style="font-family:'JetBrains Mono',monospace;">Thinks While You Sleep</h3>
-        <p class="text-muted/80 text-sm leading-relaxed">After 2h inactivity: dedup, rescore, cluster, morning briefing. Runs entirely on-device. Zero API calls. Like REM sleep for your agents.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        </div>
-        <h3 class="font-bold text-lg mb-2" style="font-family:'JetBrains Mono',monospace;">Inspectable Vault</h3>
-        <p class="text-muted/80 text-sm leading-relaxed">Every memory as a <code style="color:var(--cta);font-family:'JetBrains Mono',monospace;font-size:0.8rem;">.md</code> file with YAML frontmatter. Open in Obsidian. grep it. git it. No black box database lock-in.</p>
-      </div>
-    </div>
-  </div>
-</section>
+      <div class="p-5 overflow-x-auto">
+        <pre class="font-mono text-xs md:text-sm leading-relaxed"><span class="text-cta">$</span> <span class="text-text">curl -X POST http://localhost:4050/api/v1/ingest \</span>
+<span class="text-text">  -H 'Content-Type: application/json' \</span>
+<span class="text-text">  -d '{"content":"Christoph prefers dark mode","namespace":"preferences"}'</span>
+<span class="text-muted/60">{"memory_id":"01d0e...","stored":true,"retention_score":0.45}</span>
 
-<!-- ═══════════ DEMO ═══════════ -->
-<section class="section">
-  <div class="container max-w-3xl">
-    <h2 class="font-bold text-3xl text-center mb-2" style="font-family:'JetBrains Mono',monospace;">See It Work</h2>
-    <p class="text-muted/60 text-center mb-8">Full ingest → recall → sleep → vault cycle. Real output from a Raspberry Pi.</p>
-    <div class="terminal">
-      <div class="terminal-header">
-        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
-        <span class="font-mono text-xs text-muted/40 ml-2">demo — bash</span>
-      </div>
-      <div class="terminal-body">
-        <pre class="font-mono text-xs md:text-sm leading-relaxed" style="font-family:'JetBrains Mono',monospace;"><span style="color:var(--cta)">$  curl POST /api/v1/ingest -d '{"content":"Christoph prefers dark mode","namespace":"preferences"}'</span>
-<span style="color:var(--muted)">{"memory_id":"01d0e...","stored":true,"retention_score":0.45}</span>
+<span class="text-cta">$</span> <span class="text-text">curl -X POST http://localhost:4050/api/v1/recall \</span>
+<span class="text-text">  -H 'Content-Type: application/json' \</span>
+<span class="text-text">  -d '{"query":"editor theme preference"}'</span>
+<span class="text-muted/60">{"results":[{"content":"Christoph prefers dark mode in all editors","score":0.28}]}</span>
 
-<span style="color:var(--cta)">$  curl POST /api/v1/recall -d '{"query":"editor theme preference"}'</span>
-<span style="color:var(--muted)">{"results":[{"content":"Christoph prefers dark mode in all editors","score":0.28}]}</span>
-
-<span style="color:var(--cta)">$  curl POST /api/v1/sleep/start</span>
-<span style="color:var(--muted)">[sleep] Running: _task_dedup_today
+<span class="text-cta">$</span> <span class="text-text">curl -X POST http://localhost:4050/api/v1/sleep/start</span>
+<span class="text-muted/60">[sleep] Running: _task_dedup_today
 {"status":"started","checkpoint":{"_task_dedup_today":true}}</span>
 
-<span style="color:var(--cta)">$  cat ~/.mnemlet/vault/preferences/2026-05/01d0e....md</span>
-<span style="color:var(--muted)">---</span>
-<span style="color:var(--muted)">id: 01d0e...</span>
-<span style="color:var(--muted)">namespace: preferences</span>
-<span style="color:var(--muted)">retention_score: 0.45</span>
-<span style="color:var(--muted)">---</span>
-<span style="color:var(--text)">Christoph prefers dark mode in all editors</span>
-<span style="color:var(--cta)">$</span> <span class="cursor-blink">█</span></pre>
+<span class="text-cta">$</span> <span class="text-text">cat ~/.mnemlet/vault/preferences/2026-05/01d0e....md</span>
+<span class="text-muted/60">---
+id: 01d0e...
+namespace: preferences
+retention_score: 0.45
+---
+Christoph prefers dark mode in all editors</span>
+<span class="text-cta">$</span> <span class="blink">█</span></pre>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════ COMPARISON ═══════════ -->
-<section class="section">
-  <div class="container">
-    <h2 class="font-bold text-3xl text-center mb-2" style="font-family:'JetBrains Mono',monospace;">Honest Comparison</h2>
-    <p class="text-muted/60 text-center mb-8 max-w-lg mx-auto">No checkmark bingo. Where Mnémlet shines, and where it doesn't.</p>
-    <div class="overflow-x-auto terminal">
-      <table class="w-full text-sm comparison-table" style="font-family:'IBM Plex Sans',sans-serif;">
+<!-- Comparison -->
+<section class="py-24 px-6">
+  <div class="max-w-6xl mx-auto">
+    <h2 class="font-mono text-3xl md:text-4xl font-bold text-center mb-4">Honest Comparison</h2>
+    <p class="text-muted/70 text-center mb-10 font-sans max-w-xl mx-auto">No checkmark bingo. Here's where Mnémlet shines, and where it doesn't.</p>
+    <div class="overflow-x-auto rounded-xl border border-border">
+      <table class="w-full text-sm font-sans">
         <thead>
-          <tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;font-family:'JetBrains Mono',monospace;color:var(--muted);background:rgba(30,41,59,0.3)"></th>
-            <th style="text-align:left;font-family:'JetBrains Mono',monospace;color:var(--cta);background:rgba(34,197,94,0.05)"><a href="https://github.com/christoph/mnemlet" style="color:var(--cta);text-decoration:none;">Mnémlet</a></th>
-            <th style="text-align:left;font-family:'JetBrains Mono',monospace;color:var(--text)"><a href="https://github.com/mem0ai/mem0" style="color:var(--text);text-decoration:none;">Mem0</a></th>
-            <th style="text-align:left;font-family:'JetBrains Mono',monospace;color:var(--text)"><a href="https://github.com/MemPalace/mempalace" style="color:var(--text);text-decoration:none;">MemPalace</a></th>
-            <th style="text-align:left;font-family:'JetBrains Mono',monospace;color:var(--text)" class="hide-mobile"><a href="https://github.com/Gentleman-Programming/engram" style="color:var(--text);text-decoration:none;">Engram</a></th>
+          <tr class="border-b border-border">
+            <th class="p-4 text-left font-mono font-semibold text-text bg-card/50"></th>
+            <th class="p-4 text-left font-mono font-semibold text-cta bg-cta/5">Mnémlet</th>
+            <th class="p-4 text-left font-mono font-semibold text-text bg-card/50">Mem0</th>
+            <th class="p-4 text-left font-mono font-semibold text-text bg-card/50">MemPalace</th>
+            <th class="p-4 text-left font-mono font-semibold text-text bg-card/50 hidden md:table-cell">Engram</th>
+            <th class="p-4 text-left font-mono font-semibold text-text bg-card/50 hidden lg:table-cell">NeoCortex</th>
           </tr>
         </thead>
-        <tbody style="color:var(--muted)">
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Self-hosted</td><td style="color:var(--cta)">✅</td><td style="color:#EAB308">⚠️</td><td>✅</td><td class="hide-mobile">✅</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Decay / Forgetting</td><td style="color:var(--cta)">✅</td><td style="color:#EF4444">❌</td><td style="color:#EF4444">❌</td><td class="hide-mobile" style="color:#EF4444">❌</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Sleep / Consolidation</td><td style="color:var(--cta)">✅</td><td style="color:#EF4444">❌</td><td style="color:#EF4444">❌</td><td class="hide-mobile" style="color:#EF4444">❌</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Local LLM support</td><td style="color:var(--cta)">✅</td><td style="color:#EF4444">❌</td><td style="color:#EF4444">❌</td><td class="hide-mobile" style="color:#EF4444">❌</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Inspectable vault</td><td style="color:var(--cta)">✅</td><td style="color:#EF4444">❌</td><td style="color:#EF4444">❌</td><td class="hide-mobile" style="color:#EAB308">⚠️</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Vector search</td><td style="color:var(--cta)">✅</td><td style="color:var(--cta)">✅</td><td style="color:var(--cta)">✅</td><td class="hide-mobile" style="color:#EF4444">❌</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>TUI Dashboard</td><td style="color:#EF4444">❌</td><td style="color:#EF4444">❌</td><td style="color:#EF4444">❌</td><td class="hide-mobile" style="color:var(--cta)">✅</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Cloud sync</td><td style="color:#EF4444">❌</td><td style="color:var(--cta)">✅</td><td style="color:#EF4444">❌</td><td class="hide-mobile" style="color:var(--cta)">✅</td></tr>
-          <tr style="border-bottom:1px solid rgba(51,65,85,0.3)"><td>Pi-friendly RAM</td><td style="color:var(--cta)">✅ 450MB</td><td style="color:#EF4444">❌</td><td style="color:var(--cta)">✅</td><td class="hide-mobile" style="color:var(--cta)">✅</td></tr>
+        <tbody class="text-muted/80">
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">Self-hosted</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-yellow-400 font-mono">⚠️</td>
+            <td class="p-4 font-mono">✅</td>
+            <td class="p-4 font-mono hidden md:table-cell">✅</td>
+            <td class="p-4 text-red-400 font-mono hidden lg:table-cell">❌</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">Decay / Forgetting</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono hidden md:table-cell">❌</td>
+            <td class="p-4 text-cta font-mono hidden lg:table-cell">✅</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">Sleep / Consolidation</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono hidden md:table-cell">❌</td>
+            <td class="p-4 text-red-400 font-mono hidden lg:table-cell">❌</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">Local LLM support</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono hidden md:table-cell">❌</td>
+            <td class="p-4 text-red-400 font-mono hidden lg:table-cell">❌</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">Inspectable vault</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-yellow-400 font-mono hidden md:table-cell">⚠️</td>
+            <td class="p-4 text-red-400 font-mono hidden lg:table-cell">❌</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">Vector search</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-red-400 font-mono hidden md:table-cell">❌</td>
+            <td class="p-4 text-cta font-mono hidden lg:table-cell">✅</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">TUI Dashboard</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-cta font-mono hidden md:table-cell">✅</td>
+            <td class="p-4 text-red-400 font-mono hidden lg:table-cell">❌</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">Cloud sync</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-cta font-mono hidden md:table-cell">✅</td>
+            <td class="p-4 text-cta font-mono hidden lg:table-cell">✅</td>
+          </tr>
+          <tr class="border-b border-border/50 hover:bg-card/30">
+            <td class="p-4 text-muted font-medium">MCP tools</td>
+            <td class="p-4 text-cta font-mono">8</td>
+            <td class="p-4 font-mono">~10</td>
+            <td class="p-4 font-mono">29</td>
+            <td class="p-4 font-mono hidden md:table-cell">19</td>
+            <td class="p-4 text-red-400 font-mono hidden lg:table-cell">❌</td>
+          </tr>
+          <tr>
+            <td class="p-4 text-muted font-medium">Pi-friendly RAM</td>
+            <td class="p-4 text-cta font-mono">✅ (450 MB)</td>
+            <td class="p-4 text-red-400 font-mono">❌</td>
+            <td class="p-4 text-cta font-mono">✅</td>
+            <td class="p-4 text-cta font-mono hidden md:table-cell">✅</td>
+            <td class="p-4 text-red-400 font-mono hidden lg:table-cell">❌</td>
+          </tr>
         </tbody>
       </table>
     </div>
-    <p class="text-muted/50 text-center mt-6 text-sm max-w-lg mx-auto leading-relaxed" style="font-family:'IBM Plex Sans',sans-serif;">Cloud sync, polished dashboard, 50k stars → <span style="color:var(--text)">Mem0 or MemPalace</span>. Local-first, brain-inspired forgetting, runs on your hardware → <span style="color:var(--cta)">Mnémlet</span>.</p>
+    <p class="text-muted/60 text-center mt-6 text-sm font-sans max-w-lg mx-auto leading-relaxed">If your priority is cloud sync, a polished dashboard, or an ecosystem with 50k stars — use Mem0 or MemPalace. If your priority is <span class="text-text/80">local-first, brain-inspired forgetting, and running on hardware you own</span> — that's Mnémlet.</p>
   </div>
 </section>
 
-<!-- ═══════════ QUICKSTART ═══════════ -->
-<section id="quickstart" class="section">
-  <div class="container max-w-2xl">
-    <h2 class="font-bold text-3xl text-center mb-2" style="font-family:'JetBrains Mono',monospace;">Quickstart</h2>
-    <p class="text-muted/60 text-center mb-8">Three commands. That's it.</p>
-    <div class="terminal">
-      <div class="terminal-header">
-        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+<!-- Quickstart -->
+<section id="quickstart" class="py-24 px-6">
+  <div class="max-w-2xl mx-auto">
+    <h2 class="font-mono text-3xl md:text-4xl font-bold text-center mb-4">Quickstart</h2>
+    <p class="text-muted/70 text-center mb-10 font-sans">Three commands. That's it.</p>
+    <div class="bg-[#0B1120] border border-border rounded-xl overflow-hidden shadow-2xl">
+      <div class="flex items-center gap-2 px-5 py-3 border-b border-border/50">
+        <div class="flex gap-1.5">
+          <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
+          <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
+        </div>
         <span class="font-mono text-xs text-muted/40 ml-2">~/mnemlet — bash</span>
       </div>
-      <div class="terminal-body">
-        <pre class="font-mono text-sm leading-relaxed" style="font-family:'JetBrains Mono',monospace;"><span style="color:var(--cta)">$</span> <span style="color:var(--text)">pip install mnemlet</span>
+      <div class="p-5 overflow-x-auto">
+        <pre class="font-mono text-xs md:text-sm leading-relaxed"><span class="text-cta">$</span> <span class="text-text">pip install mnemlet</span>
 
-<span style="color:var(--cta)">$</span> <span style="color:var(--text)">mnemlet serve</span>
-<span style="color:var(--muted)">🧠 Mnémlet v0.1.0 — http://127.0.0.1:4050</span>
+<span class="text-cta">$</span> <span class="text-text">mnemlet serve</span>
 
-<span style="color:var(--cta)">$</span> <span style="color:var(--text)">curl -X POST http://localhost:4050/api/v1/ingest \</span>
-<span style="color:var(--text)">  -H 'Content-Type: application/json' \</span>
-<span style="color:var(--text)">  -d '{"content":"Hello Mnémlet","namespace":"test"}'</span>
-<span style="color:var(--muted)">{"memory_id":"...","stored":true}</span></pre>
+<span class="text-cta">$</span> <span class="text-text">curl -X POST http://localhost:4050/api/v1/ingest \</span>
+<span class="text-text">  -H 'Content-Type: application/json' \</span>
+<span class="text-text">  -d '{"content":"Hello Mnémlet","namespace":"test"}'</span></pre>
       </div>
     </div>
-    <div class="flex justify-center gap-4 mt-8">
-      <a href="https://github.com/christoph/mnemlet" class="btn-primary">GitHub ↗</a>
-      <a href="https://pypi.org/project/mnemlet/" class="btn-secondary">PyPI ↗</a>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+      <a href="https://github.com/christoph/mnemlet" class="inline-flex items-center justify-center px-6 py-3 bg-cta text-bg font-mono font-semibold rounded-lg hover:bg-cta/90 transition-colors cursor-pointer text-sm tracking-wide">GitHub ↗</a>
+      <a href="https://pypi.org/project/mnemlet/" class="inline-flex items-center justify-center px-6 py-3 border border-border text-text font-mono rounded-lg hover:border-cta/50 hover:text-cta transition-colors cursor-pointer text-sm tracking-wide">PyPI ↗</a>
     </div>
   </div>
 </section>
 
-<!-- ═══════════ FOOTER ═══════════ -->
-<footer style="border-top:1px solid var(--border); padding:48px 0;">
-  <div class="container max-w-2xl text-center">
-    <p class="font-mono text-muted/40 text-sm mb-2" style="font-family:'JetBrains Mono',monospace;">Mnémlet — /ˈnɛm.lɛt/ — Greek mnēmē (memory) + -let (small)</p>
-    <div class="flex gap-5 justify-center my-6 text-sm">
-      <a href="https://github.com/christoph/mnemlet" style="color:var(--muted);text-decoration:none;font-family:'JetBrains Mono',monospace;" class="hover-green">GitHub</a>
-      <a href="https://pypi.org/project/mnemlet/" style="color:var(--muted);text-decoration:none;font-family:'JetBrains Mono',monospace;" class="hover-green">PyPI</a>
-      <a href="https://github.com/christoph/mnemlet#readme" style="color:var(--muted);text-decoration:none;font-family:'JetBrains Mono',monospace;" class="hover-green">README</a>
-      <a href="impressum.html" style="color:var(--muted);text-decoration:none;font-family:'IBM Plex Sans',sans-serif;" class="hover-green">Impressum</a>
-      <a href="datenschutz.html" style="color:var(--muted);text-decoration:none;font-family:'IBM Plex Sans',sans-serif;" class="hover-green">Datenschutz</a>
+<!-- Footer -->
+<footer class="py-16 px-6 border-t border-border">
+  <div class="max-w-3xl mx-auto text-center">
+    <p class="font-mono text-muted/60 text-sm mb-2">Mnémlet — /ˈnɛm.lɛt/ — from Greek mnēmē (memory) + -let (small)</p>
+    <div class="flex gap-6 justify-center my-6">
+      <a href="https://github.com/christoph/mnemlet" class="font-mono text-sm text-muted/60 hover:text-cta transition-colors cursor-pointer">GitHub</a>
+      <a href="https://pypi.org/project/mnemlet/" class="font-mono text-sm text-muted/60 hover:text-cta transition-colors cursor-pointer">PyPI</a>
+      <a href="https://github.com/christoph/mnemlet#readme" class="font-mono text-sm text-muted/60 hover:text-cta transition-colors cursor-pointer">README</a>
+      <a href="impressum.html" class="font-sans text-sm text-muted/60 hover:text-cta transition-colors cursor-pointer">Impressum</a>
+      <a href="datenschutz.html" class="font-sans text-sm text-muted/60 hover:text-cta transition-colors cursor-pointer">Datenschutz</a>
     </div>
-    <p style="color:var(--muted);opacity:0.35;font-size:0.75rem;">Built with 🧠 on a Raspberry Pi · MIT License</p>
+    <p class="font-sans text-muted/40 text-sm">Built with 🧠 on a Raspberry Pi</p>
+    <p class="font-sans text-muted/50 text-xs mt-2">MIT License</p>
   </div>
 </footer>
-
-<style>
-.hover-green:hover { color: var(--cta) !important; }
-.hide-mobile { display: table-cell; }
-@media (max-width: 640px) {
-  .hide-mobile { display: none; }
-  .terminal-body pre { font-size: 0.7rem !important; }
-}
-</style>
 
 </body>
 </html>
