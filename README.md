@@ -13,6 +13,7 @@ Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](htt
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Pi-Tested](https://img.shields.io/badge/pi--tested-RPi%205%2016GB-brightgreen)](https://www.raspberrypi.com/)
 [![Tests](https://img.shields.io/badge/tests-48%20passed-brightgreen)]()
+[![Demo](https://img.shields.io/badge/demo-asciinema-ff69b4)](scripts/demo.cast)
 
 ---
 
@@ -242,6 +243,29 @@ So I built something that runs on hardware I own, stores memories as files I can
 - **Not a cloud service.** There is no `app.mnemlet.ai`. There never will be. If you want managed hosting, look at Mem0.
 - **Not a production database.** It's AA-battery-grade infrastructure — simple, local, sufficient for one person's context. Don't use it to store customer PII or medical records.
 - **Not a replacement for your notes app.** The Markdown vault is inspectable, but it's not designed for manual note-taking. Use Obsidian for that. Use Mnémlet for agent memory.
+
+---
+
+## FAQ
+
+**Why not just use Mem0 self-hosted?**
+Mem0 is excellent. But its memory management uses LLM extraction — which costs tokens and discards raw context. Mnémlet stores verbatim content, applies brain-inspired decay *without* LLM calls, and surfaces a human-readable Markdown vault. The Sleep Engine runs on a Pi with zero API costs. If you want managed, production-grade memory with cloud features → Mem0. If you want local, transparent, brain-inspired memory that forgets naturally → Mnémlet.
+
+**Can I use Ollama running on a different host?**
+Yes. Set `[llm]` in `mnemlet.toml`: `base_url = "http://192.168.1.100:11434"`. Mnémlet talks to any OpenAI-compatible API, including remote Ollama, LM Studio, or cloud endpoints. Local is just the default.
+
+**What happens to my memories when I update Mnémlet?**
+The Markdown vault is forward-compatible — `.md` files don't change format. SQLite migrations run automatically on startup. Internal schema changes are additive (new columns, new tables). If you're paranoid, back up `~/.mnemlet/` before upgrading.
+
+**Can I isolate memories between different AI agents?**
+Yes, via namespaces: `/openwebui/christoph/`, `/openclaw/christoph/`, `/shared/`. BUT — this is *organizational* isolation, not *security* isolation. Any MCP client with access to `localhost:4050` can read all namespaces. If you need hard isolation, run separate Mnémlet instances on different ports. See [SECURITY.md](SECURITY.md).
+
+**How do I uninstall Mnémlet cleanly?**
+```bash
+pip uninstall mnemlet
+rm -rf ~/.mnemlet
+```
+That's it. No system files, no daemons, no databases left behind. We respect your machine.
 
 ---
 
