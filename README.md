@@ -1,4 +1,4 @@
-# 🧠 Engram
+# 🧠 Mnemlet
 
 **The self-hosted memory engine that learns what matters, forgets the rest — and thinks while you sleep.**
 
@@ -7,14 +7,14 @@
 
 ---
 
-## Why Engram?
+## Why Mnemlet?
 
 Your AI agents forget everything between sessions. Existing memory systems either:
 - Store everything forever (growing unboundedly)
 - Cost money per API call (cloud-dependent)
 - Only work with one agent (fragmented)
 
-**Engram is different.** It's a self-hosted, brain-inspired memory engine that:
+**Mnemlet is different.** It's a self-hosted, brain-inspired memory engine that:
 
 - 🧠 **Forgets intelligently** — Exponential time-decay + interaction-weighting. What you use stays sharp. What you ignore fades.
 - 🌐 **Works with all your agents** — MCP-native. OpenWebUI, OpenClaw, Claude Code, Cursor, any MCP client.
@@ -30,13 +30,13 @@ Your AI agents forget everything between sessions. Existing memory systems eithe
 ### Install
 
 ```bash
-pip install engram
+pip install mnemlet
 ```
 
 ### Start the server
 
 ```bash
-engram serve
+mnemlet serve
 # → http://localhost:4050
 ```
 
@@ -59,9 +59,9 @@ curl -X POST http://localhost:4050/api/v1/recall \
 ### Python SDK
 
 ```python
-from engram.client import EngramClient
+from mnemlet.client import MnemletClient
 
-c = EngramClient()
+c = MnemletClient()
 c.ingest("Hello world")
 results = c.recall("Hello")
 print(results)
@@ -72,7 +72,7 @@ print(results)
 Add to any MCP client config:
 
 ```json
-{"mcpServers": {"engram": {"url": "http://localhost:4050/mcp"}}}
+{"mcpServers": {"mnemlet": {"url": "http://localhost:4050/mcp"}}}
 ```
 
 ---
@@ -95,7 +95,7 @@ Interactions boost scores: recall +0.15, update +0.20, create +0.10, reference +
 
 ### The Sleep Engine
 
-When no API calls occur for 2+ hours, Engram enters consolidation:
+When no API calls occur for 2+ hours, Mnemlet enters consolidation:
 
 1. **Dedup** — Merge near-duplicate memories from today
 2. **Rescore** — Apply time-decay and purge stale memories
@@ -107,7 +107,7 @@ All tasks run sequentially, locally, with zero API costs.
 ### Inspectable Vault
 
 ```
-~/.engram/vault/
+~/.mnemlet/vault/
   preferences/
     2026-05/
       a1b2c3d4.md      ← Open in Obsidian!
@@ -142,13 +142,13 @@ Every memory is a Markdown file with YAML frontmatter. Full transparency.
 ## Configuration
 
 ```toml
-# engram.toml
+# mnemlet.toml
 [server]
 host = "127.0.0.1"
 port = 4050
 
 [storage]
-data_dir = "~/.engram"
+data_dir = "~/.mnemlet"
 
 [llm]
 enabled = false           # Enable for Gemma 4 E2B via Ollama
@@ -165,7 +165,7 @@ base_url = "http://localhost:8888"
 
 ## Raspberry Pi
 
-Engram runs on a Raspberry Pi 5 (16GB recommended for full feature set):
+Mnemlet runs on a Raspberry Pi 5 (16GB recommended for full feature set):
 
 | Mode | RAM |
 |---|---|
@@ -175,9 +175,9 @@ Engram runs on a Raspberry Pi 5 (16GB recommended for full feature set):
 
 ---
 
-## What Makes Engram Different
+## What Makes Mnemlet Different
 
-| | MemPalace | Mem0 | NeoCortex | Dakera | **Engram** |
+| | MemPalace | Mem0 | NeoCortex | Dakera | **Mnemlet** |
 |---|---|---|---|---|---|
 | Self-hosted | ✅ | ⚠️ | ❌ | ✅ | ✅ |
 | Decay | ❌ | ❌ | ✅ | ✅ | ✅ **deep** |

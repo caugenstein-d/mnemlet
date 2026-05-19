@@ -2,7 +2,7 @@
 
 import hashlib
 from typing import Optional
-from engram.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD
+from mnemlet.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD
 
 
 class IngestEngine:

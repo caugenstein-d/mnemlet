@@ -3,14 +3,14 @@ host = "127.0.0.1"
 port = 4050
 
 [storage]
-data_dir = "~/.engram"
-sqlite_path = "~/.engram/engram.db"
-chroma_path = "~/.engram/chroma"
-vault_path = "~/.engram/vault"
+data_dir = "~/.mnemlet"
+sqlite_path = "~/.mnemlet/mnemlet.db"
+chroma_path = "~/.mnemlet/chroma"
+vault_path = "~/.mnemlet/vault"
 
 [embedding]
 model = "all-MiniLM-L6-v2"
-cache_dir = "~/.engram/models"
+cache_dir = "~/.mnemlet/models"
 
 [llm]
 enabled = false

@@ -3,7 +3,7 @@
 import math
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from engram.constants import (
+from mnemlet.constants import (
     BOOST_CREATE, BOOST_RECALL, BOOST_UPDATE, BOOST_REFERENCE, PENALTY_IGNORE,
     DEFAULT_LAMBDA,
 )

@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from engram.server.app import create_app
-from engram.config import EngramConfig
+from mnemlet.server.app import create_app
+from mnemlet.config import MnemletConfig
 
 
 @pytest.fixture
 async def client():
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
-        config = EngramConfig(
+        config = MnemletConfig(
             data_dir=base,
-            sqlite_path=base / "engram.db",
+            sqlite_path=base / "mnemlet.db",
             chroma_path=base / "chroma",
             embedding_cache_dir=base / "models",
         )

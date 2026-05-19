@@ -1,4 +1,4 @@
-"""Default constants and thresholds for Engram."""
+"""Default constants and thresholds for Mnemlet."""
 
 # Token limits
 MAX_CHUNK_TOKENS = 3000

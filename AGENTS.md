@@ -1,6 +1,6 @@
-# Engram — Agent Instructions
+# Mnemlet — Agent Instructions
 
-Project: Engram
+Project: Mnemlet
 Phase: 1 — Core Engine
 Language: Python 3.12+
 Testing: pytest with TDD

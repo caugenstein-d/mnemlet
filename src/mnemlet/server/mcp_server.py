@@ -1,16 +1,16 @@
-"""MCP (Model Context Protocol) server for Engram — 8 tools."""
+"""MCP (Model Context Protocol) server for Mnemlet — 8 tools."""
 
 import json
 from mcp.server.fastmcp import FastMCP
 
 
 def create_mcp_server(app_state) -> FastMCP:
-    """Create an MCP server wired to the Engram app state."""
-    mcp = FastMCP("Engram Memory Engine")
+    """Create an MCP server wired to the Mnemlet app state."""
+    mcp = FastMCP("Mnemlet Memory Engine")
     mcp.settings.streamable_http_path = "/"
 
     @mcp.tool()
-    async def engram_ingest(
+    async def mnemlet_ingest(
         content: str,
         namespace: str = "default",
         importance: float = 0.5,
@@ -20,7 +20,7 @@ def create_mcp_server(app_state) -> FastMCP:
         return engine.ingest(content=content, namespace=namespace, importance=importance)
 
     @mcp.tool()
-    async def engram_recall(
+    async def mnemlet_recall(
         query: str,
         namespace: str = None,
         limit: int = 5,
@@ -31,7 +31,7 @@ def create_mcp_server(app_state) -> FastMCP:
         return {"results": results, "count": len(results)}
 
     @mcp.tool()
-    async def engram_search(
+    async def mnemlet_search(
         query: str,
         namespaces: str = None,
         limit: int = 5,
@@ -56,7 +56,7 @@ def create_mcp_server(app_state) -> FastMCP:
         return {"results": all_results, "count": len(all_results)}
 
     @mcp.tool()
-    async def engram_status() -> dict:
+    async def mnemlet_status() -> dict:
         """Get system status: memory counts, storage info, decay stats."""
         db = app_state.db
         chroma = app_state.chroma
@@ -78,7 +78,7 @@ def create_mcp_server(app_state) -> FastMCP:
         }
 
     @mcp.tool()
-    async def engram_namespaces(action: str = "list", namespace: str = None) -> dict:
+    async def mnemlet_namespaces(action: str = "list", namespace: str = None) -> dict:
         """Manage namespaces. action: 'list' to show all, 'create' to create one."""
         db = app_state.db
         if action == "list":
@@ -98,7 +98,7 @@ def create_mcp_server(app_state) -> FastMCP:
         }
 
     @mcp.tool()
-    async def engram_update(
+    async def mnemlet_update(
         memory_id: str,
         content: str = None,
         importance: float = None,
@@ -132,7 +132,7 @@ def create_mcp_server(app_state) -> FastMCP:
         return db.get_memory(memory_id)
 
     @mcp.tool()
-    async def engram_decay_config(
+    async def mnemlet_decay_config(
         namespace: str,
         action: str = "get",
         lambda_: float = None,
@@ -160,13 +160,13 @@ def create_mcp_server(app_state) -> FastMCP:
         return {"error": "invalid action. Use 'get' or 'set'."}
 
     @mcp.tool()
-    async def engram_export(format: str = "json") -> dict:
+    async def mnemlet_export(format: str = "json") -> dict:
         """Export memory statistics and vault location."""
         db = app_state.db
         vault_path = (
             str(app_state.config.vault_path)
             if hasattr(app_state, "config")
-            else "~/.engram/vault"
+            else "~/.mnemlet/vault"
         )
         count = db.conn.execute(
             "SELECT COUNT(*) FROM memories"
@@ -176,7 +176,7 @@ def create_mcp_server(app_state) -> FastMCP:
             "vault_path": vault_path,
             "export_note": (
                 "Use GET /api/v1/vault for vault path, "
-                "or engram export CLI for full dump."
+                "or mnemlet export CLI for full dump."
             ),
         }
 

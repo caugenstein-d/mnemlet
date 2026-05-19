@@ -5,9 +5,9 @@ import tempfile
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import pytest
-from engram.storage.sqlite import EngramDB
-from engram.engine.decay import DecayEngine
-from engram.constants import (
+from mnemlet.storage.sqlite import MnemletDB
+from mnemlet.engine.decay import DecayEngine
+from mnemlet.constants import (
     BOOST_RECALL, BOOST_UPDATE, BOOST_CREATE, BOOST_REFERENCE, PENALTY_IGNORE,
     DEFAULT_LAMBDA, DEFAULT_PURGE_THRESHOLD,
 )
@@ -16,7 +16,7 @@ from engram.constants import (
 @pytest.fixture
 def engine():
     with tempfile.TemporaryDirectory() as tmpdir:
-        db = EngramDB(Path(tmpdir) / "test.db")
+        db = MnemletDB(Path(tmpdir) / "test.db")
         eng = DecayEngine(db)
         yield eng
 

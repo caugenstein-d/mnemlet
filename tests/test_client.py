@@ -3,22 +3,22 @@
 
 def test_client_import():
     """Client module is importable."""
-    from engram.client import EngramClient
+    from mnemlet.client import MnemletClient
 
-    assert EngramClient is not None
+    assert MnemletClient is not None
 
 
 def test_client_default_url():
     """Client has sensible defaults."""
-    from engram.client import EngramClient
+    from mnemlet.client import MnemletClient
 
-    c = EngramClient()
+    c = MnemletClient()
     assert c.base_url == "http://localhost:4050"
 
 
 def test_client_context_manager():
     """Client works as context manager."""
-    from engram.client import EngramClient
+    from mnemlet.client import MnemletClient
 
-    with EngramClient() as c:
+    with MnemletClient() as c:
         assert c is not None

@@ -2,13 +2,13 @@
 
 import numpy as np
 import pytest
-from engram.storage.embeddings import EngramEmbedding
+from mnemlet.storage.embeddings import MnemletEmbedding
 
 
 @pytest.fixture(scope="module")
 def embedder():
     """Create an embedding model (expensive, so module-scoped)."""
-    return EngramEmbedding()
+    return MnemletEmbedding()
 
 
 def test_embed_single_text(embedder):

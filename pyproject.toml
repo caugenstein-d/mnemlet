@@ -1,7 +1,7 @@
 [project]
-name = "engram"
+name = "mnemlet"
 version = "0.1.0"
-description = "Self-hosted, brain-inspired memory engine for AI agents — for people who don't want Mem0."
+description = "Brain-inspired memory engine for your self-hosted AI stack. Runs on a Pi. No cloud, no API keys."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
@@ -26,7 +26,7 @@ dev = [
 ]
 
 [project.scripts]
-engram = "engram.__main__:main"
+mnemlet = "mnemlet.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -37,4 +37,4 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/engram"]
+packages = ["src/mnemlet"]

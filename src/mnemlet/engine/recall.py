@@ -1,9 +1,9 @@
 """Recall pipeline: embed → hybrid search → filter → return."""
 
 from typing import Optional
-from engram.constants import (DEFAULT_TOP_N, MAX_TOP_N, HYBRID_BM25_WEIGHT,
+from mnemlet.constants import (DEFAULT_TOP_N, MAX_TOP_N, HYBRID_BM25_WEIGHT,
                               HYBRID_VECTOR_WEIGHT, MAX_RECALL_TOKENS)
-from engram.engine.decay import DecayEngine
+from mnemlet.engine.decay import DecayEngine
 
 
 class RecallEngine:

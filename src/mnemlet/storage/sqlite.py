@@ -1,4 +1,4 @@
-"""SQLite database layer for Engram metadata, FTS, and graph storage."""
+"""SQLite database layer for Mnemlet metadata, FTS, and graph storage."""
 
 import sqlite3
 import uuid
@@ -83,12 +83,12 @@ END;
 """
 
 
-class EngramDB:
-    """SQLite database for Engram.
+class MnemletDB:
+    """SQLite database for Mnemlet.
 
     Note: This class is NOT thread-safe for writes. Use a single-threaded access pattern
     (which FastAPI's async event loop provides natively). For multi-threaded access,
-    instantiate with `EngramDB(path)`, then set `db._lock = threading.Lock()` and wrap
+    instantiate with `MnemletDB(path)`, then set `db._lock = threading.Lock()` and wrap
     write operations.
     """
 

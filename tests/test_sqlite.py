@@ -3,7 +3,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from engram.storage.sqlite import EngramDB
+from mnemlet.storage.sqlite import MnemletDB
 
 
 @pytest.fixture
@@ -11,7 +11,7 @@ def db():
     """Create a temporary database for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
-        database = EngramDB(db_path)
+        database = MnemletDB(db_path)
         yield database
 
 

@@ -1,11 +1,11 @@
-"""EngramClient — Python SDK for the Engram Memory Engine."""
+"""MnemletClient — Python SDK for the Mnemlet Memory Engine."""
 
 from typing import Optional
 import httpx
 
 
-class EngramClient:
-    """Client for the Engram Memory Engine REST API."""
+class MnemletClient:
+    """Client for the Mnemlet Memory Engine REST API."""
 
     def __init__(self, base_url: str = "http://localhost:4050"):
         self.base_url = base_url.rstrip("/")

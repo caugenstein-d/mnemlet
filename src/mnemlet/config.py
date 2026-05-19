@@ -5,36 +5,36 @@ from pathlib import Path
 from typing import Optional
 
 
-class EngramConfig:
-    """Engram configuration with sensible defaults."""
+class MnemletConfig:
+    """Mnemlet configuration with sensible defaults."""
 
     def __init__(
         self,
         server_host: str = "127.0.0.1",
         server_port: int = 4050,
-        data_dir: Path = Path.home() / ".engram",
+        data_dir: Path = Path.home() / ".mnemlet",
         sqlite_path: Optional[Path] = None,
         chroma_path: Optional[Path] = None,
         vault_path: Optional[Path] = None,
         embedding_model: str = "all-MiniLM-L6-v2",
         embedding_cache_dir: Optional[Path] = None,
     ):
-        self.server_host = os.environ.get("ENGRAM_HOST", server_host)
-        self.server_port = int(os.environ.get("ENGRAM_PORT", server_port))
+        self.server_host = os.environ.get("MNEMLET_HOST", server_host)
+        self.server_port = int(os.environ.get("MNEMLET_PORT", server_port))
 
-        env_data_dir = os.environ.get("ENGRAM_DATA_DIR")
+        env_data_dir = os.environ.get("MNEMLET_DATA_DIR")
         if env_data_dir:
             data_dir = Path(env_data_dir).expanduser()
 
         self.data_dir = data_dir
-        self.sqlite_path = sqlite_path or self.data_dir / "engram.db"
+        self.sqlite_path = sqlite_path or self.data_dir / "mnemlet.db"
         self.chroma_path = chroma_path or self.data_dir / "chroma"
         self.vault_path = vault_path or self.data_dir / "vault"
         self.embedding_model = embedding_model
         self.embedding_cache_dir = embedding_cache_dir or self.data_dir / "models"
 
     @classmethod
-    def from_toml(cls, path: str) -> "EngramConfig":
+    def from_toml(cls, path: str) -> "MnemletConfig":
         """Load configuration from a TOML file."""
         import tomllib
 
@@ -48,7 +48,7 @@ class EngramConfig:
         return cls(
             server_host=server.get("host", "127.0.0.1"),
             server_port=server.get("port", 4050),
-            data_dir=Path(storage.get("data_dir", "~/.engram")).expanduser(),
+            data_dir=Path(storage.get("data_dir", "~/.mnemlet")).expanduser(),
             sqlite_path=Path(storage["sqlite_path"]).expanduser() if storage.get("sqlite_path") else None,
             chroma_path=Path(storage["chroma_path"]).expanduser() if storage.get("chroma_path") else None,
             vault_path=Path(storage["vault_path"]).expanduser() if storage.get("vault_path") else None,
@@ -57,8 +57,8 @@ class EngramConfig:
         )
 
 
-def load_config(path: Optional[str] = None) -> EngramConfig:
+def load_config(path: Optional[str] = None) -> MnemletConfig:
     """Load configuration from a TOML path or return defaults."""
     if path:
-        return EngramConfig.from_toml(path)
-    return EngramConfig()
+        return MnemletConfig.from_toml(path)
+    return MnemletConfig()

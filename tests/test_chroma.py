@@ -3,19 +3,19 @@
 import tempfile
 from pathlib import Path
 import pytest
-from engram.storage.chroma import EngramChroma
-from engram.storage.embeddings import EngramEmbedding
+from mnemlet.storage.chroma import MnemletChroma
+from mnemlet.storage.embeddings import MnemletEmbedding
 
 
 @pytest.fixture(scope="module")
 def embedder():
-    return EngramEmbedding()
+    return MnemletEmbedding()
 
 
 @pytest.fixture
 def chroma(embedder):
     with tempfile.TemporaryDirectory() as tmpdir:
-        client = EngramChroma(Path(tmpdir), embedder)
+        client = MnemletChroma(Path(tmpdir), embedder)
         yield client
 
 

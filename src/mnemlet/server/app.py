@@ -4,26 +4,26 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from engram.config import EngramConfig
-from engram.storage.sqlite import EngramDB
-from engram.storage.chroma import EngramChroma
-from engram.storage.embeddings import EngramEmbedding
-from engram.storage.vault import VaultWriter
-from engram.engine.ingest import IngestEngine
-from engram.engine.recall import RecallEngine
-from engram.engine.decay import DecayEngine
-from engram.engine.sleep import SleepEngine
-from engram.server.routes import decay, ingest, recall, sleep, status
-from engram.server.mcp_server import create_mcp_server
+from mnemlet.config import MnemletConfig
+from mnemlet.storage.sqlite import MnemletDB
+from mnemlet.storage.chroma import MnemletChroma
+from mnemlet.storage.embeddings import MnemletEmbedding
+from mnemlet.storage.vault import VaultWriter
+from mnemlet.engine.ingest import IngestEngine
+from mnemlet.engine.recall import RecallEngine
+from mnemlet.engine.decay import DecayEngine
+from mnemlet.engine.sleep import SleepEngine
+from mnemlet.server.routes import decay, ingest, recall, sleep, status
+from mnemlet.server.mcp_server import create_mcp_server
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     config = app.state.config
-    app.state.db = EngramDB(config.sqlite_path)
-    app.state.embedder = EngramEmbedding(cache_dir=config.embedding_cache_dir)
-    app.state.chroma = EngramChroma(config.chroma_path, app.state.embedder)
+    app.state.db = MnemletDB(config.sqlite_path)
+    app.state.embedder = MnemletEmbedding(cache_dir=config.embedding_cache_dir)
+    app.state.chroma = MnemletChroma(config.chroma_path, app.state.embedder)
     app.state.vault = VaultWriter(config.vault_path)
     app.state.ingest_engine = IngestEngine(
         db=app.state.db,
@@ -84,13 +84,13 @@ async def lifespan(app: FastAPI):
         pass
 
 
-def create_app(config: EngramConfig = None) -> FastAPI:
+def create_app(config: MnemletConfig = None) -> FastAPI:
     """Create and configure the FastAPI application."""
     if config is None:
-        config = EngramConfig()
+        config = MnemletConfig()
 
     app = FastAPI(
-        title="Engram",
+        title="Mnemlet",
         description="Self-hosted, brain-inspired memory engine for AI agents.",
         version="0.1.0",
         lifespan=lifespan,
