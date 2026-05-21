@@ -1,6 +1,7 @@
 """Tests for the Sleep Engine idle lifecycle."""
 
 from collections.abc import Callable
+from threading import Event
 
 from mnemlet.engine.sleep import SleepEngine
 
@@ -34,7 +35,7 @@ class FastSleepEngine(SleepEngine):
         )
         self.task_runs: list[str] = []
 
-    def _tasks(self):
+    def _tasks(self) -> list[Callable[[], None]]:
         return [self._task_one, self._task_two]
 
     def _task_one(self) -> None:
@@ -42,6 +43,34 @@ class FastSleepEngine(SleepEngine):
 
     def _task_two(self) -> None:
         self.task_runs.append("two")
+
+
+class FailingSleepEngine(FastSleepEngine):
+    """SleepEngine with a task that fails deterministically."""
+
+    def _tasks(self) -> list[Callable[[], None]]:
+        return [self._task_one, self._task_fails]
+
+    def _task_fails(self) -> None:
+        self.task_runs.append("fails")
+        raise RuntimeError("boom")
+
+
+class BlockingSleepEngine(FastSleepEngine):
+    """SleepEngine with a task that blocks until stop is requested."""
+
+    def __init__(self, clock: Callable[[], float], threshold: int = 10) -> None:
+        super().__init__(clock=clock, threshold=threshold)
+        self.entered = Event()
+
+    def _tasks(self) -> list[Callable[[], None]]:
+        return [self._task_blocking, self._task_two]
+
+    def _task_blocking(self) -> None:
+        self.task_runs.append("blocking")
+        self.entered.set()
+        while self._running:
+            self.entered.wait(timeout=0.001)
 
 
 def wait_for_engine(engine: SleepEngine) -> None:
@@ -72,6 +101,59 @@ def test_completed_run_does_not_immediately_sleep_again() -> None:
     assert engine.state == "completed"
     assert engine.should_sleep() is False
     assert engine.task_runs == ["one", "two"]
+
+
+def test_completed_run_cannot_restart_in_same_epoch_after_threshold() -> None:
+    clock = FakeClock()
+    engine = FastSleepEngine(clock=clock, threshold=10)
+    clock.advance(11)
+
+    assert engine.start() == {"status": "started"}
+    wait_for_engine(engine)
+    first_thread = engine._thread
+
+    clock.advance(11)
+
+    assert engine.should_sleep() is False
+    assert engine.start() == {"status": "not_ready", "state": "completed"}
+    assert engine._thread is first_thread
+    assert engine.task_runs == ["one", "two"]
+
+
+def test_task_failure_does_not_complete_epoch_and_allows_retry() -> None:
+    clock = FakeClock()
+    engine = FailingSleepEngine(clock=clock, threshold=10)
+    clock.advance(11)
+
+    assert engine.start() == {"status": "started"}
+    wait_for_engine(engine)
+
+    assert engine.state != "completed"
+    assert engine.status()["completed_activity_epoch"] is None
+    assert engine.status()["last_completed"] is None
+    assert engine.should_sleep() is True
+    assert engine.start() == {"status": "started"}
+    wait_for_engine(engine)
+    assert engine.task_runs == ["one", "fails", "one", "fails"]
+
+
+def test_stopped_run_does_not_complete_epoch_and_allows_retry() -> None:
+    clock = FakeClock()
+    engine = BlockingSleepEngine(clock=clock, threshold=10)
+    clock.advance(11)
+
+    assert engine.start() == {"status": "started"}
+    assert engine.entered.wait(timeout=2)
+    assert engine.stop()["status"] == "stopped"
+
+    assert engine.state != "completed"
+    assert engine.status()["completed_activity_epoch"] is None
+    assert engine.status()["last_completed"] is None
+    assert engine.should_sleep() is True
+    assert engine.start() == {"status": "started"}
+    assert engine.entered.wait(timeout=2)
+    assert engine.stop()["status"] == "stopped"
+    assert engine.task_runs == ["blocking", "blocking"]
 
 
 def test_new_activity_allows_future_sleep_cycle() -> None:

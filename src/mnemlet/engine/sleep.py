@@ -68,11 +68,7 @@ class SleepEngine:
     def should_sleep(self) -> bool:
         """Check if sleep phase should start."""
         with self._lock:
-            if self._running or self._paused:
-                return False
-            if self._completed_activity_epoch == self._activity_epoch:
-                return False
-            return self._clock() - self._last_activity >= self.inactivity_threshold
+            return self._should_sleep_locked()
 
     def start(self, force: bool = False) -> dict[str, str]:
         """Start the sleep engine (non-blocking, runs in thread)."""
@@ -80,8 +76,7 @@ class SleepEngine:
             if self._running:
                 return {"status": "already_running"}
 
-            ready = self._clock() - self._last_activity >= self.inactivity_threshold
-            if not force and not ready:
+            if not force and not self._should_sleep_locked():
                 return {"status": "not_ready", "state": self._state}
 
             self._running = True
@@ -92,6 +87,14 @@ class SleepEngine:
             self._thread = threading.Thread(target=self._run_loop, daemon=True)
             self._thread.start()
         return {"status": "started"}
+
+    def _should_sleep_locked(self) -> bool:
+        """Check sleep eligibility while the engine lock is held."""
+        if self._running or self._paused:
+            return False
+        if self._completed_activity_epoch == self._activity_epoch:
+            return False
+        return self._clock() - self._last_activity >= self.inactivity_threshold
 
     def stop(self) -> dict[str, Any]:
         """Gracefully stop the sleep engine."""
@@ -128,11 +131,13 @@ class SleepEngine:
     def _run_loop(self) -> None:
         """Main sleep loop — run consolidation tasks sequentially."""
         tasks = self._tasks()
+        successful = True
 
         for task in tasks:
             with self._lock:
                 running = self._running
             if not running:
+                successful = False
                 break
             task_name = task.__name__
             if self._checkpoint.get(task_name):
@@ -145,17 +150,26 @@ class SleepEngine:
             except Exception as e:
                 print(f"[sleep] Task {task_name} failed: {e}")
                 self._checkpoint[task_name] = False
+                successful = False
+                break
 
             # Cooldown between tasks
             time.sleep(self._task_cooldown_seconds)
 
         with self._lock:
+            completed = successful and self._running
             self._running = False
-            self._state = "completed"
-            self._last_completed = self._clock()
-            self._last_activity = self._last_completed
-            self._completed_activity_epoch = self._run_epoch
-        print("[sleep] Consolidation complete")
+            if completed:
+                self._state = "completed"
+                self._last_completed = self._clock()
+                self._last_activity = self._last_completed
+                self._completed_activity_epoch = self._run_epoch
+            else:
+                self._state = "idle"
+        if completed:
+            print("[sleep] Consolidation complete")
+        else:
+            print("[sleep] Consolidation incomplete")
 
     # --- Individual Sleep Tasks (deterministic mode) ---
 
