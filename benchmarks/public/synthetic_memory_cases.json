@@ -1,0 +1,148 @@
+{
+  "name": "public-synthetic",
+  "cases": [
+    {
+      "id": "exact_fact_agent_preferences",
+      "category": "exact_fact",
+      "namespace": "agent-prefs",
+      "memories": [
+        {"id": "memory_pref_shell", "content": "Christoph prefers concise shell commands with quoted paths when needed.", "importance": 0.8},
+        {"id": "memory_pref_editor", "content": "Christoph prefers dark editor themes for long coding sessions.", "importance": 0.9},
+        {"id": "memory_pref_status", "content": "Christoph wants status updates only when they add meaningful information.", "importance": 0.7}
+      ],
+      "queries": [
+        {"id": "exact_pref_shell", "query": "How should shell paths be handled?", "expected_memory_ids": ["memory_pref_shell"], "min_expected_rank": 1},
+        {"id": "exact_pref_editor", "query": "What editor theme does Christoph prefer?", "expected_memory_ids": ["memory_pref_editor"], "min_expected_rank": 1},
+        {"id": "exact_pref_status", "query": "When should progress updates be sent?", "expected_memory_ids": ["memory_pref_status"], "min_expected_rank": 1},
+        {"id": "exact_pref_shell_quote", "query": "What is the preference for paths with spaces?", "expected_memory_ids": ["memory_pref_shell"]},
+        {"id": "exact_pref_long_sessions", "query": "Which theme helps with long coding sessions?", "expected_memory_ids": ["memory_pref_editor"]},
+        {"id": "exact_pref_meaningful_updates", "query": "What kind of status updates are preferred?", "expected_memory_ids": ["memory_pref_status"]}
+      ]
+    },
+    {
+      "id": "paraphrase_project_stack",
+      "category": "paraphrase",
+      "namespace": "project-stack",
+      "memories": [
+        {"id": "memory_stack_fastapi", "content": "The memory service exposes HTTP routes through FastAPI.", "importance": 0.7},
+        {"id": "memory_stack_sqlite", "content": "SQLite stores durable memory metadata for Mnémlet.", "importance": 0.8},
+        {"id": "memory_stack_chroma", "content": "ChromaDB backs vector similarity search in the local memory engine.", "importance": 0.8}
+      ],
+      "queries": [
+        {"id": "para_http_framework", "query": "Which web framework serves the memory API?", "expected_memory_ids": ["memory_stack_fastapi"]},
+        {"id": "para_durable_store", "query": "Where is persistent metadata kept?", "expected_memory_ids": ["memory_stack_sqlite"]},
+        {"id": "para_vector_backend", "query": "What component handles vector search?", "expected_memory_ids": ["memory_stack_chroma"]},
+        {"id": "para_api_routes", "query": "What technology provides HTTP endpoints?", "expected_memory_ids": ["memory_stack_fastapi"]},
+        {"id": "para_metadata_database", "query": "Which database holds durable metadata?", "expected_memory_ids": ["memory_stack_sqlite"]},
+        {"id": "para_similarity_search", "query": "Which system backs similarity retrieval?", "expected_memory_ids": ["memory_stack_chroma"]}
+      ]
+    },
+    {
+      "id": "namespace_isolation_tools",
+      "category": "namespace_isolation",
+      "namespace": "tools",
+      "memories": [
+        {"id": "memory_tool_opencode", "content": "OpenCode is installed under the local OpenCode binary path.", "namespace": "tools", "importance": 0.7},
+        {"id": "memory_tool_rust", "content": "Rust was installed through rustup on the ARM64 system.", "namespace": "tools", "importance": 0.7},
+        {"id": "memory_food_rust", "content": "A cast-iron pan can develop rust if left wet.", "namespace": "kitchen", "importance": 0.2}
+      ],
+      "queries": [
+        {"id": "ns_opencode_path", "query": "Which coding CLI is already installed?", "expected_memory_ids": ["memory_tool_opencode"], "forbidden_memory_ids": ["memory_food_rust"]},
+        {"id": "ns_rust_install", "query": "How was Rust installed on the system?", "expected_memory_ids": ["memory_tool_rust"], "forbidden_memory_ids": ["memory_food_rust"]},
+        {"id": "ns_cli_tool", "query": "What local tool binary exists for coding?", "expected_memory_ids": ["memory_tool_opencode"], "forbidden_memory_ids": ["memory_food_rust"]},
+        {"id": "ns_arm_toolchain", "query": "Which toolchain was installed with rustup?", "expected_memory_ids": ["memory_tool_rust"], "forbidden_memory_ids": ["memory_food_rust"]},
+        {"id": "ns_ignore_kitchen", "query": "Tell me about Rust the development tool, not kitchen rust.", "expected_memory_ids": ["memory_tool_rust"], "forbidden_memory_ids": ["memory_food_rust"]},
+        {"id": "ns_tool_namespace", "query": "Which memories belong to the tools namespace?", "expected_memory_ids": ["memory_tool_opencode", "memory_tool_rust"], "forbidden_memory_ids": ["memory_food_rust"]}
+      ]
+    },
+    {
+      "id": "distractor_resistance_codename",
+      "category": "distractor_resistance",
+      "namespace": "codenames",
+      "memories": [
+        {"id": "memory_bridge_codename", "content": "Christoph calls the Mnémlet OpenCode bridge Nebelkrähe.", "importance": 0.95},
+        {"id": "memory_bridge_distractor", "content": "Another prototype bridge was nicknamed Silberfuchs during a design sketch.", "importance": 0.3},
+        {"id": "memory_bird_fact", "content": "Carrion crows and hooded crows are both corvids.", "importance": 0.2}
+      ],
+      "queries": [
+        {"id": "dist_codename_direct", "query": "What is the OpenCode bridge codename?", "expected_memory_ids": ["memory_bridge_codename"], "forbidden_memory_ids": ["memory_bridge_distractor", "memory_bird_fact"]},
+        {"id": "dist_codename_project", "query": "What does Christoph call the Mnémlet bridge?", "expected_memory_ids": ["memory_bridge_codename"], "forbidden_memory_ids": ["memory_bridge_distractor"]},
+        {"id": "dist_codename_not_old", "query": "Which bridge name should be used instead of Silberfuchs?", "expected_memory_ids": ["memory_bridge_codename"], "forbidden_memory_ids": ["memory_bridge_distractor"]},
+        {"id": "dist_codename_corvid", "query": "Which codename mentions a corvid-like name?", "expected_memory_ids": ["memory_bridge_codename"], "forbidden_memory_ids": ["memory_bird_fact"]},
+        {"id": "dist_opencode_bridge", "query": "What nickname belongs to the OpenCode integration bridge?", "expected_memory_ids": ["memory_bridge_codename"], "forbidden_memory_ids": ["memory_bridge_distractor"]},
+        {"id": "dist_nebelkraehe", "query": "Which memory says Nebelkrähe for the bridge?", "expected_memory_ids": ["memory_bridge_codename"], "forbidden_memory_ids": ["memory_bird_fact"]}
+      ]
+    },
+    {
+      "id": "no_hit_unknown_facts",
+      "category": "no_hit",
+      "namespace": "unknowns",
+      "memories": [
+        {"id": "memory_known_color", "content": "The demo dashboard accent color is teal.", "importance": 0.4},
+        {"id": "memory_known_port", "content": "The sample local service listens on port 8719.", "importance": 0.4}
+      ],
+      "queries": [
+        {"id": "nohit_pet", "query": "What is Christoph's childhood pet name?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_bank", "query": "What is Christoph's bank account number?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_password", "query": "What password should be used for the vault?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_airline", "query": "What seat did Christoph book for tomorrow's flight?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_serial", "query": "What is the serial number of the private laptop?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_medical", "query": "What is Christoph's current prescription dosage?", "expected_memory_ids": [], "no_hit": true}
+      ]
+    },
+    {
+      "id": "recency_decay_sanity",
+      "category": "recency_decay_sanity",
+      "namespace": "decay",
+      "memories": [
+        {"id": "memory_decay_recent", "content": "The current benchmark plan says Task 2 adds dataset reporting foundations.", "importance": 0.8},
+        {"id": "memory_decay_old", "content": "An old benchmark sketch mentioned a CSV-only format.", "importance": 0.2},
+        {"id": "memory_decay_config", "content": "Mnémlet decay configuration includes a lambda value and purge threshold.", "importance": 0.6}
+      ],
+      "queries": [
+        {"id": "decay_recent_plan", "query": "What does the current Task 2 benchmark plan add?", "expected_memory_ids": ["memory_decay_recent"]},
+        {"id": "decay_old_format", "query": "What did an older benchmark sketch mention?", "expected_memory_ids": ["memory_decay_old"]},
+        {"id": "decay_config_values", "query": "Which values are part of decay configuration?", "expected_memory_ids": ["memory_decay_config"]},
+        {"id": "decay_foundations", "query": "Which memory discusses benchmark foundations?", "expected_memory_ids": ["memory_decay_recent"]},
+        {"id": "decay_csv", "query": "Where is the CSV-only idea recorded?", "expected_memory_ids": ["memory_decay_old"]},
+        {"id": "decay_purge", "query": "What memory mentions purge threshold?", "expected_memory_ids": ["memory_decay_config"]}
+      ]
+    },
+    {
+      "id": "multi_memory_context_release",
+      "category": "multi_memory_context",
+      "namespace": "release",
+      "memories": [
+        {"id": "memory_release_version", "content": "The planned Mnémlet benchmark release is version 0.2.0.", "importance": 0.7},
+        {"id": "memory_release_docs", "content": "Release notes should describe public synthetic data and private local fixtures separately.", "importance": 0.7},
+        {"id": "memory_release_checks", "content": "The release checklist requires focused benchmark tests and the full pytest suite.", "importance": 0.8}
+      ],
+      "queries": [
+        {"id": "multi_release_summary", "query": "Summarize the benchmark release expectations.", "expected_memory_ids": ["memory_release_version", "memory_release_docs", "memory_release_checks"]},
+        {"id": "multi_release_version", "query": "Which version is planned for the benchmark release?", "expected_memory_ids": ["memory_release_version"]},
+        {"id": "multi_release_docs", "query": "What should release notes say about datasets?", "expected_memory_ids": ["memory_release_docs"]},
+        {"id": "multi_release_checks", "query": "What tests are required for release confidence?", "expected_memory_ids": ["memory_release_checks"]},
+        {"id": "multi_public_private", "query": "Which memory separates public synthetic data from private fixtures?", "expected_memory_ids": ["memory_release_docs"]},
+        {"id": "multi_full_suite", "query": "Which memory mentions running the full pytest suite?", "expected_memory_ids": ["memory_release_checks"]}
+      ]
+    },
+    {
+      "id": "integration_sentinel_surface",
+      "category": "integration_sentinel",
+      "namespace": "integration",
+      "memories": [
+        {"id": "memory_sentinel_health", "content": "The integration sentinel checks that benchmark loading fails loudly on malformed fixtures.", "importance": 0.8},
+        {"id": "memory_sentinel_public", "content": "The public benchmark fixture must remain synthetic and safe to commit.", "importance": 0.9},
+        {"id": "memory_sentinel_private", "content": "Private benchmark data stays local under benchmarks/private and is ignored by git.", "importance": 0.9}
+      ],
+      "queries": [
+        {"id": "sentinel_malformed", "query": "What should happen with malformed benchmark fixtures?", "expected_memory_ids": ["memory_sentinel_health"]},
+        {"id": "sentinel_public_safe", "query": "What property must public benchmark data have?", "expected_memory_ids": ["memory_sentinel_public"]},
+        {"id": "sentinel_private_local", "query": "Where should private benchmark data stay?", "expected_memory_ids": ["memory_sentinel_private"]},
+        {"id": "sentinel_loader", "query": "Which memory describes loader validation failures?", "expected_memory_ids": ["memory_sentinel_health"]},
+        {"id": "sentinel_commit", "query": "Which dataset is safe to commit?", "expected_memory_ids": ["memory_sentinel_public"]},
+        {"id": "sentinel_ignore", "query": "Which memory says private benchmark data is ignored by git?", "expected_memory_ids": ["memory_sentinel_private"]}
+      ]
+    }
+  ]
+}

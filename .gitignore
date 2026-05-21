@@ -9,3 +9,9 @@ dist/
 htmlcov/
 .coverage
 .coverage.*
+
+# Mnémlet benchmarks
+benchmarks/private/*
+!benchmarks/private/.gitkeep
+benchmark-results/*
+!benchmark-results/.gitkeep
