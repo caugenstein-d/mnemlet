@@ -29,3 +29,20 @@ def test_runner_maps_logical_ids_to_real_memory_ids(tmp_path: Path) -> None:
         assert runner.reverse_memory_id_map[real_id] == "memory_bridge_codename"
     finally:
         runner.close()
+
+
+def test_runner_includes_canonical_query_result_aliases(tmp_path: Path) -> None:
+    dataset = load_dataset("public", root=Path.cwd())
+
+    result = run_retrieval_benchmark(dataset, output_dir=tmp_path, limit=3, min_score=0.0)
+    query_result = result["queries"][0]
+
+    assert "expected_memory_ids" in query_result
+    assert "forbidden_memory_ids" in query_result
+    assert "latency_ms" in query_result
+    assert "expected" in query_result
+    assert "forbidden" in query_result
+    assert "latency" in query_result
+    assert query_result["expected"] == query_result["expected_memory_ids"]
+    assert query_result["forbidden"] == query_result["forbidden_memory_ids"]
+    assert query_result["latency"] == query_result["latency_ms"]

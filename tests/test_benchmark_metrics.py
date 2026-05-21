@@ -66,3 +66,38 @@ def test_summarize_retrieval_counts_false_positives_for_no_hit_cases() -> None:
 
     assert summary["false_positive_rate"] == pytest.approx(0.5)
     assert summary["query_count"] == 2
+
+
+def test_summarize_retrieval_accepts_canonical_result_keys() -> None:
+    query_results = [
+        {
+            "query_id": "q1",
+            "expected": ["m1"],
+            "forbidden": ["m3"],
+            "no_hit": False,
+            "results": [
+                {"logical_id": "m2", "score": 0.8},
+                {"logical_id": "m1", "score": 0.7},
+            ],
+            "latency": 10.0,
+        },
+        {
+            "query_id": "q2",
+            "expected": ["m4"],
+            "forbidden": ["m5"],
+            "no_hit": False,
+            "results": [
+                {"logical_id": "m5", "score": 0.9},
+                {"logical_id": "m4", "score": 0.6},
+            ],
+            "latency": 30.0,
+        },
+    ]
+
+    summary = summarize_retrieval(query_results, ks=(1, 3, 5))
+
+    assert summary["hit_at_3"] == pytest.approx(1.0)
+    assert summary["mrr"] == pytest.approx(0.5)
+    assert summary["forbidden_hit_rate"] == pytest.approx(0.5)
+    assert summary["p50_latency_ms"] == pytest.approx(20.0)
+    assert summary["p95_latency_ms"] == pytest.approx(30.0)

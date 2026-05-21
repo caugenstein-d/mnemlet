@@ -126,20 +126,22 @@ class BenchmarkRunner:
                     min_score=self.min_score,
                 )
                 latency_ms = (perf_counter() - start) * 1000
-                query_results.append(
-                    {
-                        "case_id": case.id,
-                        "category": case.category,
-                        "query_id": query.id,
-                        "query": query.query,
-                        "namespace": query.namespace,
-                        "expected_memory_ids": query.expected_memory_ids,
-                        "forbidden_memory_ids": query.forbidden_memory_ids,
-                        "no_hit": query.no_hit,
-                        "latency_ms": latency_ms,
-                        "results": [self._format_result(item) for item in recalled],
-                    }
-                )
+                query_result = {
+                    "case_id": case.id,
+                    "category": case.category,
+                    "query_id": query.id,
+                    "query": query.query,
+                    "namespace": query.namespace,
+                    "expected_memory_ids": query.expected_memory_ids,
+                    "forbidden_memory_ids": query.forbidden_memory_ids,
+                    "no_hit": query.no_hit,
+                    "latency_ms": latency_ms,
+                    "results": [self._format_result(item) for item in recalled],
+                }
+                query_result["expected"] = query_result["expected_memory_ids"]
+                query_result["forbidden"] = query_result["forbidden_memory_ids"]
+                query_result["latency"] = query_result["latency_ms"]
+                query_results.append(query_result)
 
         return {
             "dataset": self.dataset.name,

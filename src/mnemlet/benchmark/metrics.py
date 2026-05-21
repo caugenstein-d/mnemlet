@@ -15,7 +15,7 @@ def summarize_retrieval(
     k_values = tuple(ks)
     regular_cases = [result for result in query_results if not result.get("no_hit", False)]
     no_hit_cases = [result for result in query_results if result.get("no_hit", False)]
-    forbidden_cases = [result for result in query_results if result.get("forbidden_memory_ids")]
+    forbidden_cases = [result for result in query_results if _forbidden_ids(result)]
 
     summary: dict[str, float | int] = {"query_count": len(query_results)}
     for k in k_values:
@@ -34,7 +34,7 @@ def summarize_retrieval(
         _forbidden_hit(result) for result in forbidden_cases
     )
 
-    latencies = sorted(float(result.get("latency_ms", 0.0)) for result in query_results)
+    latencies = sorted(float(_latency(result)) for result in query_results)
     summary["p50_latency_ms"] = float(median(latencies)) if latencies else 0.0
     summary["p95_latency_ms"] = _nearest_rank_percentile(latencies, 95)
     summary["max_latency_ms"] = max(latencies) if latencies else 0.0
@@ -49,7 +49,15 @@ def _logical_ids(result: dict[str, Any], k: int | None = None) -> list[str]:
 
 
 def _expected_ids(result: dict[str, Any]) -> set[str]:
-    return set(result.get("expected_memory_ids", []))
+    return set(result.get("expected_memory_ids", result.get("expected", [])))
+
+
+def _forbidden_ids(result: dict[str, Any]) -> set[str]:
+    return set(result.get("forbidden_memory_ids", result.get("forbidden", [])))
+
+
+def _latency(result: dict[str, Any]) -> float:
+    return float(result.get("latency_ms", result.get("latency", 0.0)))
 
 
 def _hit_at(result: dict[str, Any], k: int) -> float:
@@ -75,7 +83,7 @@ def _reciprocal_rank(result: dict[str, Any]) -> float:
 
 
 def _forbidden_hit(result: dict[str, Any]) -> float:
-    forbidden = set(result.get("forbidden_memory_ids", []))
+    forbidden = _forbidden_ids(result)
     returned = set(_logical_ids(result))
     return 1.0 if forbidden & returned else 0.0
 
