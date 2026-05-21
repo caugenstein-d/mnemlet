@@ -2,6 +2,8 @@
 
 import argparse
 import sys
+from pathlib import Path
+
 from mnemlet.config import MnemletConfig
 
 
@@ -13,6 +15,20 @@ def main():
     serve_parser.add_argument("--host", default=None, help="Bind host")
     serve_parser.add_argument("--port", type=int, default=None, help="Bind port")
     serve_parser.add_argument("--config", default=None, help="Path to TOML config file")
+
+    benchmark_parser = subparsers.add_parser("benchmark", help="Run Mnemlet benchmarks")
+    benchmark_subparsers = benchmark_parser.add_subparsers(dest="benchmark_mode", help="Benchmark modes")
+    for mode in ("quick", "full"):
+        mode_parser = benchmark_subparsers.add_parser(mode, help=f"Run {mode} benchmark")
+        mode_parser.add_argument("--dataset", default="public", help="Benchmark dataset")
+        mode_parser.add_argument("--output", default="benchmark-results/latest", help="Output directory")
+        mode_parser.add_argument("--format", default="json,md,csv", help="Comma-separated report formats")
+        mode_parser.add_argument("--min-score", type=float, default=0.1, help="Minimum recall score")
+        mode_parser.add_argument("--limit", type=int, default=5, help="Recall result limit")
+        mode_parser.add_argument("--include-adapters", action="store_true", help="Reserved for adapter checks")
+        mode_parser.add_argument("--include-live-opencode", action="store_true", help="Reserved for live OpenCode checks")
+        mode_parser.add_argument("--include-live-openwebui", action="store_true", help="Reserved for live OpenWebUI checks")
+        mode_parser.add_argument("--retrieval-only", action="store_true", help="Run only retrieval checks")
 
     args = parser.parse_args()
 
@@ -32,6 +48,34 @@ def main():
         print(f"Mnemlet v0.1.0")
         print(f"Starting server at http://{host}:{port}")
         uvicorn.run(app, host=host, port=port, log_level="info")
+    elif args.command == "benchmark":
+        if args.benchmark_mode is None:
+            benchmark_parser.print_help()
+            sys.exit(1)
+
+        from mnemlet.benchmark.datasets import load_dataset
+        from mnemlet.benchmark.reports import environment_info, new_run_id, write_reports
+        from mnemlet.benchmark.runner import run_retrieval_benchmark
+
+        output_dir = Path(args.output)
+        dataset = load_dataset(args.dataset, root=Path.cwd())
+        result = run_retrieval_benchmark(
+            dataset,
+            output_dir=output_dir,
+            limit=args.limit,
+            min_score=args.min_score,
+        )
+        result["run_id"] = new_run_id()
+        result["mode"] = args.benchmark_mode
+        result["command"] = " ".join(["mnemlet", *sys.argv[1:]])
+        result["environment"] = environment_info()
+
+        formats = tuple(item.strip() for item in args.format.split(",") if item.strip())
+        paths = write_reports(result, output_dir, formats=formats)
+
+        print(f"Benchmark complete: {result['query_count']} queries")
+        for report_format, path in paths.items():
+            print(f"{report_format}: {path}")
     else:
         parser.print_help()
         sys.exit(1)
