@@ -130,6 +130,16 @@ def test_memory_importance_outside_range_raises_error(tmp_path: Path) -> None:
         load_dataset_file(path)
 
 
+def test_memory_importance_boolean_raises_error(tmp_path: Path) -> None:
+    payload = valid_payload()
+    payload["cases"][0]["memories"][0]["importance"] = True
+    path = tmp_path / "dataset.json"
+    write_json(path, payload)
+
+    with pytest.raises(BenchmarkDatasetError, match="importance"):
+        load_dataset_file(path)
+
+
 def test_memory_tags_must_be_list_of_strings(tmp_path: Path) -> None:
     payload = valid_payload()
     payload["cases"][0]["memories"][0]["tags"] = ["ui", 7]
@@ -157,6 +167,16 @@ def test_duplicate_memory_id_raises_error(tmp_path: Path) -> None:
     write_json(path, payload)
 
     with pytest.raises(BenchmarkDatasetError, match="duplicate memory id"):
+        load_dataset_file(path)
+
+
+def test_duplicate_case_id_raises_error(tmp_path: Path) -> None:
+    payload = valid_payload()
+    payload["cases"].append(valid_payload()["cases"][0])
+    path = tmp_path / "dataset.json"
+    write_json(path, payload)
+
+    with pytest.raises(BenchmarkDatasetError, match="duplicate case id"):
         load_dataset_file(path)
 
 
@@ -210,6 +230,17 @@ def test_no_hit_true_with_expected_ids_raises_error(tmp_path: Path) -> None:
         load_dataset_file(path)
 
 
+def test_no_hit_string_value_raises_error(tmp_path: Path) -> None:
+    payload = valid_payload()
+    payload["cases"][0]["queries"][0]["expected_memory_ids"] = []
+    payload["cases"][0]["queries"][0]["no_hit"] = "false"
+    path = tmp_path / "dataset.json"
+    write_json(path, payload)
+
+    with pytest.raises(BenchmarkDatasetError, match="no_hit"):
+        load_dataset_file(path)
+
+
 def test_no_hit_category_without_explicit_marker_raises_error(tmp_path: Path) -> None:
     payload = valid_payload()
     payload["cases"][0]["category"] = "no_hit"
@@ -218,6 +249,19 @@ def test_no_hit_category_without_explicit_marker_raises_error(tmp_path: Path) ->
     write_json(path, payload)
 
     with pytest.raises(BenchmarkDatasetError, match="no_hit"):
+        load_dataset_file(path)
+
+
+@pytest.mark.parametrize("min_expected_rank", [0, -1, True])
+def test_min_expected_rank_must_be_positive_non_bool_int(
+    tmp_path: Path, min_expected_rank: int | bool
+) -> None:
+    payload = valid_payload()
+    payload["cases"][0]["queries"][0]["min_expected_rank"] = min_expected_rank
+    path = tmp_path / "dataset.json"
+    write_json(path, payload)
+
+    with pytest.raises(BenchmarkDatasetError, match="min_expected_rank"):
         load_dataset_file(path)
 
 

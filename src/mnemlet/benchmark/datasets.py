@@ -86,9 +86,16 @@ def _parse_dataset(payload: Any) -> BenchmarkDataset:
         raise BenchmarkDatasetError("dataset cases must be a non-empty list")
 
     cases: list[BenchmarkCase] = []
+    case_ids: set[str] = set()
     memory_ids: set[str] = set()
     query_ids: set[str] = set()
     for raw_case in raw_cases:
+        if not isinstance(raw_case, dict):
+            raise BenchmarkDatasetError("case must be an object")
+        case_id = _required_string(raw_case, "id", "case")
+        if case_id in case_ids:
+            raise BenchmarkDatasetError(f"duplicate case id: {case_id}")
+        case_ids.add(case_id)
         case = _parse_case(raw_case, memory_ids, query_ids)
         cases.append(case)
 
@@ -147,7 +154,9 @@ def _parse_memory(
         raise BenchmarkDatasetError(f"memory {memory_id} namespace must be a non-empty string")
 
     importance = payload.get("importance", 0.5)
-    if not isinstance(importance, int | float) or not 0 <= importance <= 1:
+    if isinstance(importance, bool) or not isinstance(importance, int | float):
+        raise BenchmarkDatasetError(f"memory {memory_id} importance must be numeric")
+    if not 0 <= importance <= 1:
         raise BenchmarkDatasetError(f"memory {memory_id} importance must be between 0 and 1")
 
     tags = _string_list(payload.get("tags", []), f"memory {memory_id} tags")
@@ -198,10 +207,18 @@ def _parse_query(
     )
 
     min_expected_rank = payload.get("min_expected_rank", 1)
-    if not isinstance(min_expected_rank, int):
-        raise BenchmarkDatasetError(f"query {query_id} min_expected_rank must be an int")
+    if (
+        isinstance(min_expected_rank, bool)
+        or not isinstance(min_expected_rank, int)
+        or min_expected_rank < 1
+    ):
+        raise BenchmarkDatasetError(
+            f"query {query_id} min_expected_rank must be a positive int"
+        )
 
-    no_hit = bool(payload.get("no_hit", False))
+    no_hit = payload.get("no_hit", False)
+    if not isinstance(no_hit, bool):
+        raise BenchmarkDatasetError(f"query {query_id} no_hit must be a boolean")
     if no_hit and expected_ids:
         raise BenchmarkDatasetError(
             f"query {query_id} no_hit queries must not declare expected memory ids"

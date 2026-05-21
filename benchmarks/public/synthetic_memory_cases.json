@@ -82,12 +82,12 @@
         {"id": "memory_known_port", "content": "The sample local service listens on port 8719.", "importance": 0.4}
       ],
       "queries": [
-        {"id": "nohit_pet", "query": "What is Christoph's childhood pet name?", "expected_memory_ids": [], "no_hit": true},
-        {"id": "nohit_bank", "query": "What is Christoph's bank account number?", "expected_memory_ids": [], "no_hit": true},
-        {"id": "nohit_password", "query": "What password should be used for the vault?", "expected_memory_ids": [], "no_hit": true},
-        {"id": "nohit_airline", "query": "What seat did Christoph book for tomorrow's flight?", "expected_memory_ids": [], "no_hit": true},
-        {"id": "nohit_serial", "query": "What is the serial number of the private laptop?", "expected_memory_ids": [], "no_hit": true},
-        {"id": "nohit_medical", "query": "What is Christoph's current prescription dosage?", "expected_memory_ids": [], "no_hit": true}
+        {"id": "nohit_cloud_mascot", "query": "What name did the fictional cloud mascot receive?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_mascot_badge", "query": "What badge color did the fictional launch mascot wear?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_garden_gate", "query": "What fictional access phrase was assigned to the demo garden gate?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_stargazer_seat", "query": "Which observatory seat did the fictional stargazer reserve?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_rover_prop", "query": "What inventory code was printed on the fictional moon rover prop?", "expected_memory_ids": [], "no_hit": true},
+        {"id": "nohit_robot_snack", "query": "What snack did the fictional test robot choose after rehearsal?", "expected_memory_ids": [], "no_hit": true}
       ]
     },
     {
