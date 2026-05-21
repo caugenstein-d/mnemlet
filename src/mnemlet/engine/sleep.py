@@ -1,10 +1,10 @@
 """Sleep Engine — night consolidation during user inactivity."""
 
-import time
 import threading
+import time
+from collections.abc import Callable
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Optional
+from typing import Any
 
 
 class SleepEngine:
@@ -14,72 +14,125 @@ class SleepEngine:
     Tasks run sequentially, never in parallel.
     """
 
-    def __init__(self, db, chroma, embedder, vault, decay_engine=None,
-                 inactivity_threshold_seconds: int = 7200):
+    def __init__(
+        self,
+        db: Any,
+        chroma: Any,
+        embedder: Any,
+        vault: Any,
+        decay_engine: Any | None = None,
+        inactivity_threshold_seconds: int = 7200,
+        clock: Callable[[], float] | None = None,
+        task_cooldown_seconds: float = 30,
+    ) -> None:
         self.db = db
         self.chroma = chroma
         self.embedder = embedder
         self.vault = vault
         self.decay = decay_engine
         self.inactivity_threshold = inactivity_threshold_seconds
-        self._last_activity = time.time()
+        self._clock = clock or time.monotonic
+        self._task_cooldown_seconds = task_cooldown_seconds
+        self._last_activity = self._clock()
         self._running = False
         self._paused = False
-        self._thread = None
+        self._state = "idle"
+        self._thread: threading.Thread | None = None
         self._checkpoint = {}  # task_name -> completed (bool)
+        self._activity_epoch = 0
+        self._run_epoch: int | None = None
+        self._completed_activity_epoch: int | None = None
+        self._last_completed: float | None = None
+        self._lock = threading.Lock()
 
-    def bump_activity(self):
+    def bump_activity(self) -> None:
         """Call this on every API request to reset inactivity timer."""
-        self._last_activity = time.time()
+        with self._lock:
+            self._last_activity = self._clock()
+            self._activity_epoch += 1
+            if not self._running:
+                self._state = "idle"
 
     @property
     def state(self) -> str:
         """Current sleep engine state."""
-        if not self._running:
-            return "idle"
-        if self._paused:
-            return "paused"
-        return "running"
+        with self._lock:
+            return self._state
 
     @property
     def idle_seconds(self) -> float:
         """Seconds since last activity."""
-        return time.time() - self._last_activity
+        with self._lock:
+            return self._clock() - self._last_activity
 
     def should_sleep(self) -> bool:
         """Check if sleep phase should start."""
-        return self.idle_seconds >= self.inactivity_threshold and not self._running
+        with self._lock:
+            if self._running or self._paused:
+                return False
+            if self._completed_activity_epoch == self._activity_epoch:
+                return False
+            return self._clock() - self._last_activity >= self.inactivity_threshold
 
-    def start(self, force: bool = False):
+    def start(self, force: bool = False) -> dict[str, str]:
         """Start the sleep engine (non-blocking, runs in thread)."""
-        if self._running and not force:
-            return {"status": "already_running"}
+        with self._lock:
+            if self._running:
+                return {"status": "already_running"}
 
-        self._running = True
-        self._paused = False
-        self._thread = threading.Thread(target=self._run_loop, daemon=True)
-        self._thread.start()
+            ready = self._clock() - self._last_activity >= self.inactivity_threshold
+            if not force and not ready:
+                return {"status": "not_ready", "state": self._state}
+
+            self._running = True
+            self._paused = False
+            self._state = "running"
+            self._checkpoint = {}
+            self._run_epoch = self._activity_epoch
+            self._thread = threading.Thread(target=self._run_loop, daemon=True)
+            self._thread.start()
         return {"status": "started"}
 
-    def stop(self):
+    def stop(self) -> dict[str, Any]:
         """Gracefully stop the sleep engine."""
-        self._running = False
-        self._paused = False
+        with self._lock:
+            self._running = False
+            self._paused = False
+            self._state = "idle"
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=30)
         return {"status": "stopped", "checkpoint": self._checkpoint}
 
-    def _run_loop(self):
-        """Main sleep loop — run consolidation tasks sequentially."""
-        tasks = [
+    def status(self) -> dict[str, Any]:
+        """Return sleep engine status for API callers."""
+        with self._lock:
+            return {
+                "state": self._state,
+                "idle_seconds": self._clock() - self._last_activity,
+                "threshold_seconds": self.inactivity_threshold,
+                "last_completed": self._last_completed,
+                "activity_epoch": self._activity_epoch,
+                "completed_activity_epoch": self._completed_activity_epoch,
+                "checkpoint": self._checkpoint,
+            }
+
+    def _tasks(self) -> list[Callable[[], None]]:
+        """Return the consolidation tasks for one sleep run."""
+        return [
             self._task_dedup_today,
             self._task_rescore_stale,
             self._task_cluster_similar,
             self._task_prepare_briefing,
         ]
 
+    def _run_loop(self) -> None:
+        """Main sleep loop — run consolidation tasks sequentially."""
+        tasks = self._tasks()
+
         for task in tasks:
-            if not self._running:
+            with self._lock:
+                running = self._running
+            if not running:
                 break
             task_name = task.__name__
             if self._checkpoint.get(task_name):
@@ -94,14 +147,19 @@ class SleepEngine:
                 self._checkpoint[task_name] = False
 
             # Cooldown between tasks
-            time.sleep(30)
+            time.sleep(self._task_cooldown_seconds)
 
-        self._running = False
+        with self._lock:
+            self._running = False
+            self._state = "completed"
+            self._last_completed = self._clock()
+            self._last_activity = self._last_completed
+            self._completed_activity_epoch = self._run_epoch
         print("[sleep] Consolidation complete")
 
     # --- Individual Sleep Tasks (deterministic mode) ---
 
-    def _task_dedup_today(self):
+    def _task_dedup_today(self) -> None:
         """Find and merge near-duplicate memories created today."""
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         rows = self.db.conn.execute(
@@ -127,7 +185,7 @@ class SleepEngine:
 
         self.db.conn.commit()
 
-    def _task_rescore_stale(self):
+    def _task_rescore_stale(self) -> None:
         """Apply decay to stale memories and run purge."""
         if self.decay:
             result = self.decay.decay_all_active(limit=500)
@@ -135,7 +193,7 @@ class SleepEngine:
                   f"decayed {result['decayed']}, "
                   f"cold={result['moved_to_cold']}, deleted={result['hard_deleted']}")
 
-    def _task_cluster_similar(self):
+    def _task_cluster_similar(self) -> None:
         """Group semantically similar memories from today."""
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         rows = self.db.conn.execute(
@@ -155,7 +213,7 @@ class SleepEngine:
         for ns, count in ns_counts.most_common(5):
             print(f"[sleep] Cluster: namespace '{ns}' has {count} new memories today")
 
-    def _task_prepare_briefing(self):
+    def _task_prepare_briefing(self) -> None:
         """Generate a morning briefing from top-scored recent memories."""
         rows = self.db.conn.execute(
             """SELECT content_preview, namespace, retention_score
