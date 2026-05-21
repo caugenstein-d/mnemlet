@@ -18,8 +18,10 @@ def main():
 
     benchmark_parser = subparsers.add_parser("benchmark", help="Run Mnemlet benchmarks")
     benchmark_subparsers = benchmark_parser.add_subparsers(dest="benchmark_mode", help="Benchmark modes")
+    benchmark_mode_parsers = {}
     for mode in ("quick", "full"):
         mode_parser = benchmark_subparsers.add_parser(mode, help=f"Run {mode} benchmark")
+        benchmark_mode_parsers[mode] = mode_parser
         mode_parser.add_argument("--dataset", default="public", help="Benchmark dataset")
         mode_parser.add_argument("--output", default="benchmark-results/latest", help="Output directory")
         mode_parser.add_argument("--format", default="json,md,csv", help="Comma-separated report formats")
@@ -57,6 +59,7 @@ def main():
         from mnemlet.benchmark.reports import environment_info, new_run_id, write_reports
         from mnemlet.benchmark.runner import run_retrieval_benchmark
 
+        formats = _parse_benchmark_formats(args.format, benchmark_mode_parsers[args.benchmark_mode])
         output_dir = Path(args.output)
         dataset = load_dataset(args.dataset, root=Path.cwd())
         result = run_retrieval_benchmark(
@@ -70,7 +73,6 @@ def main():
         result["command"] = " ".join(["mnemlet", *sys.argv[1:]])
         result["environment"] = environment_info()
 
-        formats = tuple(item.strip() for item in args.format.split(",") if item.strip())
         paths = write_reports(result, output_dir, formats=formats)
 
         print(f"Benchmark complete: {result['query_count']} queries")
@@ -79,6 +81,21 @@ def main():
     else:
         parser.print_help()
         sys.exit(1)
+
+
+def _parse_benchmark_formats(value: str, parser: argparse.ArgumentParser) -> tuple[str, ...]:
+    formats = tuple(item.strip() for item in value.split(",") if item.strip())
+    supported_formats = {"json", "md", "csv"}
+    unsupported_formats = sorted(set(formats) - supported_formats)
+    if not formats:
+        parser.error("invalid --format: at least one format is required")
+    if unsupported_formats:
+        parser.error(
+            "unsupported --format value(s): "
+            + ", ".join(unsupported_formats)
+            + "; supported formats are json, md, csv"
+        )
+    return formats
 
 
 if __name__ == "__main__":

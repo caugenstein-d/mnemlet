@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
-
-
-PYTHON = Path("/home/christoph/mnemlet/.venv/bin/python")
 
 
 def test_benchmark_quick_writes_requested_reports(tmp_path: Path) -> None:
@@ -16,7 +14,7 @@ def test_benchmark_quick_writes_requested_reports(tmp_path: Path) -> None:
 
     result = subprocess.run(
         [
-            str(PYTHON),
+            sys.executable,
             "-m",
             "mnemlet",
             "benchmark",
@@ -41,3 +39,35 @@ def test_benchmark_quick_writes_requested_reports(tmp_path: Path) -> None:
     assert (tmp_path / "report.md").exists()
     assert (tmp_path / "results.csv").exists()
     assert "Benchmark complete" in result.stdout
+
+
+def test_benchmark_quick_rejects_invalid_format_before_running(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mnemlet",
+            "benchmark",
+            "quick",
+            "--dataset",
+            "public",
+            "--output",
+            str(tmp_path),
+            "--format",
+            "xml",
+            "--retrieval-only",
+        ],
+        cwd=Path.cwd(),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.returncode != 0
+    assert "unsupported" in result.stderr.lower() or "invalid" in result.stderr.lower()
+    assert "Traceback" not in result.stderr
+    assert not (tmp_path / "results.json").exists()

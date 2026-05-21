@@ -162,10 +162,16 @@ def _weak_cases(result: dict[str, Any]) -> list[tuple[dict[str, Any], str]]:
     for query in result.get("queries", []):
         returned_ids = set(_returned_logical_ids(query))
         expected_ids = set(query.get("expected_memory_ids", []))
+        forbidden_ids = set(query.get("forbidden_memory_ids", []))
+        reasons: list[str] = []
         if query.get("no_hit") and returned_ids:
-            weak.append((query, "no-hit query returned results"))
+            reasons.append("false_positive")
         elif expected_ids and not expected_ids.intersection(returned_ids):
-            weak.append((query, "expected memory not returned"))
+            reasons.append("missing_expected")
+        if forbidden_ids.intersection(returned_ids):
+            reasons.append("forbidden_hit")
+        if reasons:
+            weak.append((query, ", ".join(reasons)))
     return weak
 
 

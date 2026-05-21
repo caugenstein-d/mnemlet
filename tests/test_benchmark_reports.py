@@ -77,3 +77,53 @@ def test_markdown_describes_methodology_environment_and_limitations(tmp_path: Pa
     assert "temp storage is discarded after the run" in markdown
     assert "inspectable" not in markdown.lower()
     assert "persistent" not in markdown.lower()
+
+
+def test_markdown_flags_forbidden_memory_hits(tmp_path: Path) -> None:
+    result = sample_result()
+    result["queries"] = [
+        {
+            "case_id": "case-1",
+            "category": "retrieval",
+            "query_id": "query-forbidden",
+            "query": "What is the answer?",
+            "latency_ms": 12.0,
+            "expected_memory_ids": ["m1"],
+            "forbidden_memory_ids": ["m2"],
+            "results": [
+                {"logical_id": "m1", "score": 0.9, "namespace": "test", "content": "answer"},
+                {"logical_id": "m2", "score": 0.8, "namespace": "test", "content": "wrong"},
+            ],
+        }
+    ]
+
+    write_reports(result, tmp_path, formats=("md",))
+
+    markdown = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "query-forbidden" in markdown
+    assert "forbidden_hit" in markdown
+
+
+def test_markdown_flags_no_hit_false_positive(tmp_path: Path) -> None:
+    result = sample_result()
+    result["queries"] = [
+        {
+            "case_id": "case-1",
+            "category": "retrieval",
+            "query_id": "query-no-hit",
+            "query": "No matching memory should exist",
+            "latency_ms": 12.0,
+            "expected_memory_ids": [],
+            "forbidden_memory_ids": [],
+            "no_hit": True,
+            "results": [
+                {"logical_id": "m1", "score": 0.9, "namespace": "test", "content": "answer"},
+            ],
+        }
+    ]
+
+    write_reports(result, tmp_path, formats=("md",))
+
+    markdown = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "query-no-hit" in markdown
+    assert "false_positive" in markdown
