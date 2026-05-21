@@ -79,6 +79,22 @@ def test_markdown_describes_methodology_environment_and_limitations(tmp_path: Pa
     assert "persistent" not in markdown.lower()
 
 
+def test_markdown_includes_adapter_check_details_when_present(tmp_path: Path) -> None:
+    result = sample_result()
+    result["adapter_results"] = [
+        {"name": "rest_recall", "surface": "rest", "success": True},
+        {"name": "openwebui_filter", "surface": "openwebui", "success": False, "error": "filter path missing"},
+    ]
+
+    write_reports(result, tmp_path, formats=("md",))
+
+    markdown = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "## Adapter Checks" in markdown
+    assert "| Name | Surface | Success | Details |" in markdown
+    assert "| rest_recall | rest | true |  |" in markdown
+    assert "| openwebui_filter | openwebui | false | filter path missing |" in markdown
+
+
 def test_markdown_flags_forbidden_memory_hits(tmp_path: Path) -> None:
     result = sample_result()
     result["queries"] = [

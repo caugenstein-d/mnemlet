@@ -27,7 +27,7 @@ def main():
         mode_parser.add_argument("--format", default="json,md,csv", help="Comma-separated report formats")
         mode_parser.add_argument("--min-score", type=float, default=0.1, help="Minimum recall score")
         mode_parser.add_argument("--limit", type=int, default=5, help="Recall result limit")
-        mode_parser.add_argument("--include-adapters", action="store_true", help="Reserved for adapter checks")
+        mode_parser.add_argument("--include-adapters", action="store_true", help="Run safe adapter-level checks")
         mode_parser.add_argument("--include-live-opencode", action="store_true", help="Reserved for live OpenCode checks")
         mode_parser.add_argument("--include-live-openwebui", action="store_true", help="Reserved for live OpenWebUI checks")
         mode_parser.add_argument("--retrieval-only", action="store_true", help="Run only retrieval checks")
@@ -72,6 +72,13 @@ def main():
         result["mode"] = args.benchmark_mode
         result["command"] = " ".join(["mnemlet", *sys.argv[1:]])
         result["environment"] = environment_info()
+
+        if args.include_adapters and not args.retrieval_only:
+            from mnemlet.benchmark.adapters import run_adapter_checks, summarize_adapter_results
+
+            adapter_results = run_adapter_checks()
+            result["adapter_results"] = adapter_results
+            result["summary"].update(summarize_adapter_results(adapter_results))
 
         paths = write_reports(result, output_dir, formats=formats)
 

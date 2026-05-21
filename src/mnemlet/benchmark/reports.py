@@ -85,6 +85,23 @@ def _markdown_report(result: dict[str, Any]) -> str:
     for key, value in result.get("summary", {}).items():
         lines.append(f"| {key} | {value} |")
 
+    adapter_results = result.get("adapter_results", [])
+    if adapter_results:
+        lines.extend(
+            [
+                "",
+                "## Adapter Checks",
+                "",
+                "| Name | Surface | Success | Details |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for item in adapter_results:
+            lines.append(
+                f"| {_markdown_cell(item.get('name', ''))} | {_markdown_cell(item.get('surface', ''))} | "
+                f"{str(item.get('success') is True).lower()} | {_markdown_cell(_adapter_details(item))} |"
+            )
+
     lines.extend(
         [
             "",
@@ -130,6 +147,19 @@ def _markdown_report(result: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def _adapter_details(item: dict[str, Any]) -> str:
+    if item.get("error"):
+        return str(item["error"])
+    missing = item.get("missing")
+    if missing:
+        return "missing: " + ", ".join(str(value) for value in missing)
+    return ""
+
+
+def _markdown_cell(value: Any) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ")
 
 
 def _write_csv(result: dict[str, Any], path: Path) -> None:
