@@ -117,7 +117,7 @@ def _parse_case(
     if not isinstance(raw_queries, list) or not raw_queries:
         raise BenchmarkDatasetError(f"case {case_id} queries must be a non-empty list")
     queries = [
-        _parse_query(raw_query, category, namespace, case_memory_ids, query_ids)
+        _parse_query(raw_query, namespace, case_memory_ids, query_ids)
         for raw_query in raw_queries
     ]
 
@@ -167,7 +167,6 @@ def _parse_memory(
 
 def _parse_query(
     payload: Any,
-    category: str,
     case_namespace: str,
     case_memory_ids: set[str],
     query_ids: set[str],
@@ -202,7 +201,11 @@ def _parse_query(
     if not isinstance(min_expected_rank, int):
         raise BenchmarkDatasetError(f"query {query_id} min_expected_rank must be an int")
 
-    no_hit = bool(payload.get("no_hit", False)) or category == "no_hit"
+    no_hit = bool(payload.get("no_hit", False))
+    if no_hit and expected_ids:
+        raise BenchmarkDatasetError(
+            f"query {query_id} no_hit queries must not declare expected memory ids"
+        )
     if not no_hit and not expected_ids and not expected_substrings:
         raise BenchmarkDatasetError(
             f"query {query_id} must declare expected ids/substrings or no_hit"
