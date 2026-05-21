@@ -213,14 +213,25 @@ def _weak_cases(result: dict[str, Any]) -> list[tuple[dict[str, Any], str]]:
     for query in result.get("queries", []):
         returned_ids = set(_returned_logical_ids(query))
         expected_ids = set(query.get("expected_memory_ids", []))
+        expected_substrings = list(query.get("expected_substrings", []))
+        expected_namespaces = set(query.get("expected_namespaces", []))
         forbidden_ids = set(query.get("forbidden_memory_ids", []))
         reasons: list[str] = []
+        first_rank = _first_expected_rank(query)
+        has_expectations = bool(expected_ids or expected_substrings or expected_namespaces)
         if query.get("no_hit") and returned_ids:
             reasons.append("false_positive")
-        elif expected_ids and not expected_ids.intersection(returned_ids):
+        elif has_expectations and first_rank is None:
             reasons.append("missing_expected")
+        if expected_substrings and not _has_expected_substring(query):
+            reasons.append("missing_expected_substring")
+        if expected_namespaces and not _has_expected_namespace(query):
+            reasons.append("missing_expected_namespace")
         if forbidden_ids.intersection(returned_ids):
             reasons.append("forbidden_hit")
+        min_expected_rank = int(query.get("min_expected_rank", 1))
+        if first_rank is not None and first_rank > min_expected_rank:
+            reasons.append("rank_gt_min")
         if reasons:
             weak.append((query, ", ".join(reasons)))
     return weak
@@ -232,3 +243,41 @@ def _returned_logical_ids(query: dict[str, Any]) -> list[str]:
         for item in query.get("results", [])
         if item.get("logical_id") is not None
     ]
+
+
+def _has_expected_substring(query: dict[str, Any]) -> bool:
+    expected_substrings = list(query.get("expected_substrings", []))
+    return any(
+        substring in str(item.get("content", ""))
+        for item in query.get("results", [])
+        for substring in expected_substrings
+    )
+
+
+def _has_expected_namespace(query: dict[str, Any]) -> bool:
+    expected_namespaces = set(query.get("expected_namespaces", []))
+    return any(item.get("namespace") in expected_namespaces for item in query.get("results", []))
+
+
+def _first_expected_rank(query: dict[str, Any]) -> int | None:
+    for index, item in enumerate(query.get("results", []), start=1):
+        if _matches_expected(query, item):
+            return index
+    return None
+
+
+def _matches_expected(query: dict[str, Any], item: dict[str, Any]) -> bool:
+    expected_namespaces = set(query.get("expected_namespaces", []))
+    if expected_namespaces and item.get("namespace") not in expected_namespaces:
+        return False
+
+    expected_ids = set(query.get("expected_memory_ids", query.get("expected", [])))
+    if expected_ids and item.get("logical_id") in expected_ids:
+        return True
+
+    expected_substrings = list(query.get("expected_substrings", []))
+    content = str(item.get("content", ""))
+    if expected_substrings and any(substring in content for substring in expected_substrings):
+        return True
+
+    return bool(expected_namespaces and not expected_ids and not expected_substrings)

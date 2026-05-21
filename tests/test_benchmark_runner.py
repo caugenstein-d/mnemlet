@@ -40,6 +40,9 @@ def test_runner_includes_canonical_query_result_aliases(tmp_path: Path) -> None:
     assert "expected_memory_ids" in query_result
     assert "forbidden_memory_ids" in query_result
     assert "latency_ms" in query_result
+    assert "expected_substrings" in query_result
+    assert "expected_namespaces" in query_result
+    assert "min_expected_rank" in query_result
     assert "expected" in query_result
     assert "forbidden" in query_result
     assert "latency" in query_result

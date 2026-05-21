@@ -27,6 +27,9 @@ def summarize_retrieval(
         )
 
     summary["mrr"] = _average(_reciprocal_rank(result) for result in regular_cases)
+    summary["min_expected_rank_rate"] = _average(
+        _min_expected_rank_met(result) for result in regular_cases
+    )
     summary["false_positive_rate"] = _average(
         1.0 if result.get("results") else 0.0 for result in no_hit_cases
     )
@@ -52,6 +55,14 @@ def _expected_ids(result: dict[str, Any]) -> set[str]:
     return set(result.get("expected_memory_ids", result.get("expected", [])))
 
 
+def _expected_substrings(result: dict[str, Any]) -> list[str]:
+    return list(result.get("expected_substrings", []))
+
+
+def _expected_namespaces(result: dict[str, Any]) -> set[str]:
+    return set(result.get("expected_namespaces", []))
+
+
 def _forbidden_ids(result: dict[str, Any]) -> set[str]:
     return set(result.get("forbidden_memory_ids", result.get("forbidden", [])))
 
@@ -61,25 +72,54 @@ def _latency(result: dict[str, Any]) -> float:
 
 
 def _hit_at(result: dict[str, Any], k: int) -> float:
-    expected = _expected_ids(result)
-    returned = set(_logical_ids(result, k))
-    return 1.0 if expected & returned else 0.0
+    return 1.0 if _expected_match_ranks(result, k) else 0.0
 
 
 def _precision_at(result: dict[str, Any], k: int) -> float:
     if k <= 0:
         return 0.0
-    expected = _expected_ids(result)
-    returned = _logical_ids(result, k)
-    return sum(1 for logical_id in returned if logical_id in expected) / k
+    return len(_expected_match_ranks(result, k)) / k
 
 
 def _reciprocal_rank(result: dict[str, Any]) -> float:
-    expected = _expected_ids(result)
-    for index, logical_id in enumerate(_logical_ids(result), start=1):
-        if logical_id in expected:
-            return 1.0 / index
+    ranks = _expected_match_ranks(result)
+    if ranks:
+        return 1.0 / ranks[0]
     return 0.0
+
+
+def _min_expected_rank_met(result: dict[str, Any]) -> float:
+    ranks = _expected_match_ranks(result)
+    if not ranks:
+        return 0.0
+    min_expected_rank = int(result.get("min_expected_rank", 1))
+    return 1.0 if ranks[0] <= min_expected_rank else 0.0
+
+
+def _expected_match_ranks(result: dict[str, Any], k: int | None = None) -> list[int]:
+    items = result.get("results", [])
+    if k is not None:
+        items = items[:k]
+    return [index for index, item in enumerate(items, start=1) if _matches_expected(result, item)]
+
+
+def _matches_expected(result: dict[str, Any], item: dict[str, Any]) -> bool:
+    expected_ids = _expected_ids(result)
+    expected_substrings = _expected_substrings(result)
+    expected_namespaces = _expected_namespaces(result)
+    namespace = str(item.get("namespace", ""))
+    if expected_namespaces and namespace not in expected_namespaces:
+        return False
+
+    logical_id = str(item.get("logical_id", ""))
+    if expected_ids and logical_id in expected_ids:
+        return True
+
+    content = str(item.get("content", ""))
+    if expected_substrings and any(substring in content for substring in expected_substrings):
+        return True
+
+    return bool(expected_namespaces and not expected_ids and not expected_substrings)
 
 
 def _forbidden_hit(result: dict[str, Any]) -> float:

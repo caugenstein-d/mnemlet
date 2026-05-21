@@ -159,3 +159,67 @@ def test_markdown_flags_no_hit_false_positive(tmp_path: Path) -> None:
     markdown = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "query-no-hit" in markdown
     assert "false_positive" in markdown
+
+
+def test_markdown_flags_unmet_substring_namespace_and_rank_expectations(tmp_path: Path) -> None:
+    result = sample_result()
+    result["queries"] = [
+        {
+            "case_id": "case-1",
+            "category": "retrieval",
+            "query_id": "query-substring",
+            "expected_memory_ids": [],
+            "expected_substrings": ["Nebelkrähe"],
+            "expected_namespaces": [],
+            "min_expected_rank": 1,
+            "results": [{"logical_id": "m1", "namespace": "test", "content": "wrong"}],
+        },
+        {
+            "case_id": "case-1",
+            "category": "retrieval",
+            "query_id": "query-namespace",
+            "expected_memory_ids": [],
+            "expected_substrings": ["Nebelkrähe"],
+            "expected_namespaces": ["integration/sentinel"],
+            "min_expected_rank": 1,
+            "results": [{"logical_id": "m1", "namespace": "other", "content": "Nebelkrähe"}],
+        },
+        {
+            "case_id": "case-1",
+            "category": "retrieval",
+            "query_id": "query-rank",
+            "expected_memory_ids": ["m1"],
+            "expected_substrings": [],
+            "expected_namespaces": [],
+            "min_expected_rank": 1,
+            "results": [
+                {"logical_id": "m2", "namespace": "test", "content": "wrong"},
+                {"logical_id": "m1", "namespace": "test", "content": "answer"},
+            ],
+        },
+        {
+            "case_id": "case-1",
+            "category": "retrieval",
+            "query_id": "query-split",
+            "expected_memory_ids": [],
+            "expected_substrings": ["Nebelkrähe"],
+            "expected_namespaces": ["integration/sentinel"],
+            "min_expected_rank": 1,
+            "results": [
+                {"logical_id": "m1", "namespace": "other", "content": "Nebelkrähe"},
+                {"logical_id": "m2", "namespace": "integration/sentinel", "content": "wrong"},
+            ],
+        },
+    ]
+
+    write_reports(result, tmp_path, formats=("md",))
+
+    markdown = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "query-substring" in markdown
+    assert "missing_expected_substring" in markdown
+    assert "query-namespace" in markdown
+    assert "missing_expected_namespace" in markdown
+    assert "query-rank" in markdown
+    assert "rank_gt_min" in markdown
+    assert "query-split" in markdown
+    assert "missing_expected" in markdown
