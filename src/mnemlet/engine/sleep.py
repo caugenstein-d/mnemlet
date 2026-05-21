@@ -24,6 +24,7 @@ class SleepEngine:
         inactivity_threshold_seconds: int = 7200,
         clock: Callable[[], float] | None = None,
         task_cooldown_seconds: float = 30,
+        stop_join_timeout_seconds: float = 30.0,
     ) -> None:
         self.db = db
         self.chroma = chroma
@@ -33,6 +34,7 @@ class SleepEngine:
         self.inactivity_threshold = inactivity_threshold_seconds
         self._clock = clock or time.monotonic
         self._task_cooldown_seconds = task_cooldown_seconds
+        self._stop_join_timeout_seconds = stop_join_timeout_seconds
         self._last_activity = self._clock()
         self._running = False
         self._paused = False
@@ -65,6 +67,12 @@ class SleepEngine:
         with self._lock:
             return self._clock() - self._last_activity
 
+    @property
+    def checkpoint(self) -> dict[str, bool]:
+        """Return a snapshot of completed task checkpoints."""
+        with self._lock:
+            return dict(self._checkpoint)
+
     def should_sleep(self) -> bool:
         """Check if sleep phase should start."""
         with self._lock:
@@ -73,7 +81,7 @@ class SleepEngine:
     def start(self, force: bool = False) -> dict[str, str]:
         """Start the sleep engine (non-blocking, runs in thread)."""
         with self._lock:
-            if self._running:
+            if self._running or self._worker_alive_locked():
                 return {"status": "already_running"}
 
             if not force and not self._should_sleep_locked():
@@ -90,11 +98,15 @@ class SleepEngine:
 
     def _should_sleep_locked(self) -> bool:
         """Check sleep eligibility while the engine lock is held."""
-        if self._running or self._paused:
+        if self._running or self._paused or self._worker_alive_locked():
             return False
         if self._completed_activity_epoch == self._activity_epoch:
             return False
         return self._clock() - self._last_activity >= self.inactivity_threshold
+
+    def _worker_alive_locked(self) -> bool:
+        """Check whether a worker thread is still alive while locked."""
+        return self._thread is not None and self._thread.is_alive()
 
     def stop(self) -> dict[str, Any]:
         """Gracefully stop the sleep engine."""
@@ -103,8 +115,8 @@ class SleepEngine:
             self._paused = False
             self._state = "idle"
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=30)
-        return {"status": "stopped", "checkpoint": self._checkpoint}
+            self._thread.join(timeout=self._stop_join_timeout_seconds)
+        return {"status": "stopped", "checkpoint": self.checkpoint}
 
     def status(self) -> dict[str, Any]:
         """Return sleep engine status for API callers."""
@@ -116,7 +128,7 @@ class SleepEngine:
                 "last_completed": self._last_completed,
                 "activity_epoch": self._activity_epoch,
                 "completed_activity_epoch": self._completed_activity_epoch,
-                "checkpoint": self._checkpoint,
+                "checkpoint": dict(self._checkpoint),
             }
 
     def _tasks(self) -> list[Callable[[], None]]:
@@ -140,16 +152,20 @@ class SleepEngine:
                 successful = False
                 break
             task_name = task.__name__
-            if self._checkpoint.get(task_name):
-                continue  # Already completed, skip
+            with self._lock:
+                completed_task = self._checkpoint.get(task_name)
+            if completed_task:
+                continue
 
             try:
                 print(f"[sleep] Running: {task_name}")
                 task()
-                self._checkpoint[task_name] = True
+                with self._lock:
+                    self._checkpoint[task_name] = True
             except Exception as e:
                 print(f"[sleep] Task {task_name} failed: {e}")
-                self._checkpoint[task_name] = False
+                with self._lock:
+                    self._checkpoint[task_name] = False
                 successful = False
                 break
 

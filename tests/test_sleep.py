@@ -73,6 +73,34 @@ class BlockingSleepEngine(FastSleepEngine):
             self.entered.wait(timeout=0.001)
 
 
+class IgnoringStopSleepEngine(SleepEngine):
+    """SleepEngine with a task that ignores stop until released."""
+
+    def __init__(self, clock: Callable[[], float], threshold: int = 10) -> None:
+        super().__init__(
+            db=None,
+            chroma=None,
+            embedder=None,
+            vault=None,
+            decay_engine=None,
+            inactivity_threshold_seconds=threshold,
+            clock=clock,
+            task_cooldown_seconds=0,
+            stop_join_timeout_seconds=0.01,
+        )
+        self.entered = Event()
+        self.release = Event()
+        self.task_runs: list[str] = []
+
+    def _tasks(self) -> list[Callable[[], None]]:
+        return [self._task_blocking]
+
+    def _task_blocking(self) -> None:
+        self.task_runs.append("blocking")
+        self.entered.set()
+        self.release.wait(timeout=2)
+
+
 def wait_for_engine(engine: SleepEngine) -> None:
     """Wait for the engine's background thread to finish."""
     assert engine._thread is not None
@@ -154,6 +182,46 @@ def test_stopped_run_does_not_complete_epoch_and_allows_retry() -> None:
     assert engine.entered.wait(timeout=2)
     assert engine.stop()["status"] == "stopped"
     assert engine.task_runs == ["blocking", "blocking"]
+
+
+def test_live_worker_prevents_restart_after_stop_timeout() -> None:
+    clock = FakeClock()
+    engine = IgnoringStopSleepEngine(clock=clock, threshold=10)
+
+    assert engine.start(force=True) == {"status": "started"}
+    assert engine.entered.wait(timeout=2)
+    first_thread = engine._thread
+
+    assert engine.stop()["status"] == "stopped"
+    assert first_thread is not None
+    assert first_thread.is_alive()
+    assert engine.start(force=True) == {"status": "already_running"}
+    assert engine._thread is first_thread
+    assert engine.task_runs == ["blocking"]
+
+    engine.release.set()
+    wait_for_engine(engine)
+
+    assert engine.start(force=True) == {"status": "started"}
+    wait_for_engine(engine)
+    assert engine.task_runs == ["blocking", "blocking"]
+
+
+def test_checkpoint_accessors_return_copies() -> None:
+    clock = FakeClock()
+    engine = FastSleepEngine(clock=clock, threshold=10)
+    clock.advance(11)
+
+    assert engine.start() == {"status": "started"}
+    wait_for_engine(engine)
+
+    checkpoint = engine.checkpoint
+    checkpoint["_task_one"] = False
+    status = engine.status()
+    status["checkpoint"]["_task_two"] = False
+
+    assert engine.checkpoint == {"_task_one": True, "_task_two": True}
+    assert engine.status()["checkpoint"] == {"_task_one": True, "_task_two": True}
 
 
 def test_new_activity_allows_future_sleep_cycle() -> None:
