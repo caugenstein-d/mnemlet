@@ -1,8 +1,11 @@
 """FastAPI application factory."""
 
 import asyncio
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from mnemlet.config import MnemletConfig
 from mnemlet.storage.sqlite import MnemletDB
@@ -17,8 +20,18 @@ from mnemlet.server.routes import decay, ingest, recall, sleep, status
 from mnemlet.server.mcp_server import create_mcp_server
 
 
+def _get_mcp_session_manager(mcp_app: Any) -> Any:
+    """Locate FastMCP's streamable HTTP session manager from its route endpoint."""
+    for route in mcp_app.routes:
+        endpoint = getattr(route, "endpoint", None)
+        session_manager = getattr(endpoint, "session_manager", None)
+        if session_manager is not None:
+            return session_manager
+    raise RuntimeError("FastMCP session manager route endpoint not found")
+
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup and shutdown lifecycle."""
     config = app.state.config
     app.state.db = MnemletDB(config.sqlite_path)
@@ -47,10 +60,7 @@ async def lifespan(app: FastAPI):
         decay_engine=decay_engine,
     )
 
-    mcp = create_mcp_server(app.state)
-    app.mount("/mcp", mcp.streamable_http_app())
-
-    async def decay_loop():
+    async def decay_loop() -> None:
         """Run decay processing every 6 hours."""
         while True:
             await asyncio.sleep(6 * 3600)  # 6 hours
@@ -61,7 +71,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 print(f"[decay] error: {e}")
 
-    async def sleep_monitor():
+    async def sleep_monitor() -> None:
         """Check inactivity and trigger sleep phase."""
         while True:
             await asyncio.sleep(300)  # Check every 5 minutes
@@ -69,22 +79,28 @@ async def lifespan(app: FastAPI):
                 print("[sleep] Inactivity threshold reached, starting consolidation...")
                 app.state.sleep_engine.start()
 
-    task = asyncio.create_task(decay_loop())
-    sleep_task = asyncio.create_task(sleep_monitor())
-    yield
-    task.cancel()
-    sleep_task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
-    try:
-        await sleep_task
-    except asyncio.CancelledError:
-        pass
+    async with AsyncExitStack() as stack:
+        await stack.enter_async_context(
+            app.state.mcp_app.router.lifespan_context(app.state.mcp_app)
+        )
+        task = asyncio.create_task(decay_loop())
+        sleep_task = asyncio.create_task(sleep_monitor())
+        try:
+            yield
+        finally:
+            task.cancel()
+            sleep_task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            try:
+                await sleep_task
+            except asyncio.CancelledError:
+                pass
 
 
-def create_app(config: MnemletConfig = None) -> FastAPI:
+def create_app(config: MnemletConfig | None = None) -> FastAPI:
     """Create and configure the FastAPI application."""
     if config is None:
         config = MnemletConfig()
@@ -96,6 +112,11 @@ def create_app(config: MnemletConfig = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.config = config
+    mcp = create_mcp_server(app.state)
+    mcp_app = mcp.streamable_http_app()
+    app.state.mcp_app = mcp_app
+    app.state.mcp_session_manager = _get_mcp_session_manager(mcp_app)
+    app.mount("/mcp", mcp_app)
 
     app.add_middleware(
         CORSMiddleware,
@@ -105,7 +126,10 @@ def create_app(config: MnemletConfig = None) -> FastAPI:
     )
 
     @app.middleware("http")
-    async def track_activity(request, call_next):
+    async def track_activity(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         """Bump sleep engine activity on every API call."""
         if hasattr(request.app.state, 'sleep_engine'):
             request.app.state.sleep_engine.bump_activity()
