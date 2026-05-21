@@ -95,6 +95,22 @@ def test_markdown_includes_adapter_check_details_when_present(tmp_path: Path) ->
     assert "| openwebui_filter | openwebui | false | filter path missing |" in markdown
 
 
+def test_markdown_includes_live_check_details_when_present(tmp_path: Path) -> None:
+    result = sample_result()
+    result["live_results"] = [
+        {"name": "opencode_mcp_list", "surface": "opencode-live", "success": True},
+        {"name": "openwebui_version", "surface": "openwebui-live", "success": False, "error": "connection refused"},
+    ]
+
+    write_reports(result, tmp_path, formats=("md",))
+
+    markdown = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "## Live Checks" in markdown
+    assert "environment-dependent" in markdown
+    assert "| opencode_mcp_list | opencode-live | true |  |" in markdown
+    assert "| openwebui_version | openwebui-live | false | connection refused |" in markdown
+
+
 def test_markdown_flags_forbidden_memory_hits(tmp_path: Path) -> None:
     result = sample_result()
     result["queries"] = [

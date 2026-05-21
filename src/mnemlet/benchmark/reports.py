@@ -102,6 +102,25 @@ def _markdown_report(result: dict[str, Any]) -> str:
                 f"{str(item.get('success') is True).lower()} | {_markdown_cell(_adapter_details(item))} |"
             )
 
+    live_results = result.get("live_results", [])
+    if live_results:
+        lines.extend(
+            [
+                "",
+                "## Live Checks",
+                "",
+                "These checks are environment-dependent and reflect the local machine configuration at run time.",
+                "",
+                "| Name | Surface | Success | Details |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for item in live_results:
+            lines.append(
+                f"| {_markdown_cell(item.get('name', ''))} | {_markdown_cell(item.get('surface', ''))} | "
+                f"{str(item.get('success') is True).lower()} | {_markdown_cell(_adapter_details(item))} |"
+            )
+
     lines.extend(
         [
             "",
@@ -152,6 +171,8 @@ def _markdown_report(result: dict[str, Any]) -> str:
 def _adapter_details(item: dict[str, Any]) -> str:
     if item.get("error"):
         return str(item["error"])
+    if item.get("success") is False and item.get("returncode") is not None:
+        return f"exit {item['returncode']}"
     missing = item.get("missing")
     if missing:
         return "missing: " + ", ".join(str(value) for value in missing)

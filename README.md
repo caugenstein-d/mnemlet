@@ -111,6 +111,22 @@ Add to any MCP client config:
 
 ---
 
+## Benchmarks
+
+Mnémlet includes a reproducible public benchmark suite with synthetic, commit-safe memory cases.
+
+Run it locally:
+
+```bash
+mnemlet benchmark quick --dataset public --output benchmark-results/latest --format json,md,csv
+```
+
+The report includes hit@K, MRR, precision@K, false-positive rate, forbidden-hit rate, and latency percentiles. Public claims should cite the dataset, command, environment, and generated report.
+
+Private real-world benchmarks can be stored under `benchmarks/private/`, which is ignored by git.
+
+---
+
 ## How It Works
 
 ### The Brain Model

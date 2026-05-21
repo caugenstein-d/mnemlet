@@ -28,8 +28,8 @@ def main():
         mode_parser.add_argument("--min-score", type=float, default=0.1, help="Minimum recall score")
         mode_parser.add_argument("--limit", type=int, default=5, help="Recall result limit")
         mode_parser.add_argument("--include-adapters", action="store_true", help="Run safe adapter-level checks")
-        mode_parser.add_argument("--include-live-opencode", action="store_true", help="Reserved for live OpenCode checks")
-        mode_parser.add_argument("--include-live-openwebui", action="store_true", help="Reserved for live OpenWebUI checks")
+        mode_parser.add_argument("--include-live-opencode", action="store_true", help="Run opt-in live OpenCode checks in full mode")
+        mode_parser.add_argument("--include-live-openwebui", action="store_true", help="Run opt-in live OpenWebUI checks in full mode")
         mode_parser.add_argument("--retrieval-only", action="store_true", help="Run only retrieval checks")
 
     args = parser.parse_args()
@@ -79,6 +79,17 @@ def main():
             adapter_results = run_adapter_checks()
             result["adapter_results"] = adapter_results
             result["summary"].update(summarize_adapter_results(adapter_results))
+
+        if args.benchmark_mode == "full":
+            from mnemlet.benchmark.live import run_live_checks
+
+            if args.retrieval_only:
+                result["live_results"] = []
+            else:
+                result["live_results"] = run_live_checks(
+                    include_opencode=args.include_live_opencode,
+                    include_openwebui=args.include_live_openwebui,
+                )
 
         paths = write_reports(result, output_dir, formats=formats)
 
