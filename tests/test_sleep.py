@@ -178,6 +178,7 @@ def test_stopped_run_does_not_complete_epoch_and_allows_retry() -> None:
     assert engine.status()["completed_activity_epoch"] is None
     assert engine.status()["last_completed"] is None
     assert engine.should_sleep() is True
+    engine.entered.clear()
     assert engine.start() == {"status": "started"}
     assert engine.entered.wait(timeout=2)
     assert engine.stop()["status"] == "stopped"
