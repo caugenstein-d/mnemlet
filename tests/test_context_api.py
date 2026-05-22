@@ -128,3 +128,24 @@ async def test_context_endpoint_include_superseded_toggle() -> None:
     assert excluded.status_code == 200
     excluded_data = excluded.json()
     assert excluded_data["context_pack"]["superseded"] == []
+
+
+@pytest.mark.asyncio
+async def test_review_and_explain_routes_roundtrip() -> None:
+    async with _client() as client:
+        remember = await client.post(
+            "/api/v1/remember",
+            json={"content": "OpenWebUI darf nicht restarted werden", "namespace": "ops", "importance": 0.9, "memory_type": "instruction"},
+        )
+        memory_id = remember.json()["memory_id"]
+
+        confirm = await client.post(f"/api/v1/confirm/{memory_id}")
+        explain = await client.get(f"/api/v1/explain/{memory_id}")
+        forget = await client.post(f"/api/v1/forget/{memory_id}")
+
+    assert remember.status_code == 200
+    assert confirm.status_code == 200
+    assert explain.status_code == 200
+    assert explain.json()["memory_type"] == "instruction"
+    assert forget.status_code == 200
+    assert forget.json()["status"] == "forgotten"

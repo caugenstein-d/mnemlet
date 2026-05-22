@@ -53,6 +53,46 @@ def create_mcp_server(app_state) -> FastMCP:
         return build_context_pack(query, results, include_superseded=include_superseded)
 
     @mcp.tool()
+    async def mnemlet_explain(memory_id: str) -> dict:
+        """Explain provenance and lifecycle metadata for a memory."""
+        from mnemlet.intelligence.provenance import explain_memory
+
+        return explain_memory(app_state.db, memory_id)
+
+    @mcp.tool()
+    async def mnemlet_remember(
+        content: str,
+        namespace: str = "default",
+        importance: float = 0.5,
+        memory_type: str = None,
+    ) -> dict:
+        """Deliberately store a memory, optionally with explicit type."""
+        from mnemlet.intelligence.review import ReviewService
+
+        return ReviewService(app_state.db, app_state.ingest_engine).remember(content, namespace, importance, memory_type)
+
+    @mcp.tool()
+    async def mnemlet_forget(memory_id: str) -> dict:
+        """Mark a memory as forgotten without deleting it."""
+        from mnemlet.intelligence.review import ReviewService
+
+        return ReviewService(app_state.db, app_state.ingest_engine).forget(memory_id)
+
+    @mcp.tool()
+    async def mnemlet_replace(memory_id: str, new_content: str, importance: float = 0.5) -> dict:
+        """Replace a memory by superseding it and storing a new version."""
+        from mnemlet.intelligence.review import ReviewService
+
+        return ReviewService(app_state.db, app_state.ingest_engine).replace(memory_id, new_content, importance)
+
+    @mcp.tool()
+    async def mnemlet_confirm(memory_id: str) -> dict:
+        """Confirm a memory and boost its retention score."""
+        from mnemlet.intelligence.review import ReviewService
+
+        return ReviewService(app_state.db, app_state.ingest_engine).confirm(memory_id)
+
+    @mcp.tool()
     async def mnemlet_search(
         query: str,
         namespaces: str = None,

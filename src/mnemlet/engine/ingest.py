@@ -21,6 +21,9 @@ class IngestEngine:
         namespace: str = "default",
         importance: float = 0.5,
         metadata: Optional[dict] = None,
+        dedup: bool = True,
+        memory_type: str | None = None,
+        type_source: str | None = None,
     ) -> dict:
         """Ingest a memory: chunk, dedup, embed, store. Return result."""
         chunks = self._chunk(content)
@@ -30,7 +33,7 @@ class IngestEngine:
             memory_id = self._content_id(chunk, namespace)
             content_hash = hashlib.sha256(chunk.encode()).hexdigest()
 
-            if i == 0 and len(chunks) == 1 and self._is_duplicate(chunk, namespace):
+            if dedup and i == 0 and len(chunks) == 1 and self._is_duplicate(chunk, namespace):
                 existing = self.db.get_memory(memory_id)
                 if existing:
                     return {
@@ -50,14 +53,23 @@ class IngestEngine:
                 importance=importance,
                 metadata=metadata,
             )
-            classification = classify_memory(chunk, namespace)
-            self.db.update_memory_type(
-                memory_id,
-                classification.memory_type,
-                classification.confidence,
-                classification.source,
-                classification.summary,
-            )
+            if memory_type is not None:
+                self.db.update_memory_type(
+                    memory_id,
+                    memory_type,
+                    1.0 if type_source == "manual" else 0.8,
+                    type_source or "manual",
+                    chunk[:160],
+                )
+            else:
+                classification = classify_memory(chunk, namespace)
+                self.db.update_memory_type(
+                    memory_id,
+                    classification.memory_type,
+                    classification.confidence,
+                    classification.source,
+                    classification.summary,
+                )
             db_result = self.db.get_memory(memory_id) or db_result
 
             self.chroma.add(
