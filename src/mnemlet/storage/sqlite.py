@@ -1,10 +1,13 @@
 """SQLite database layer for Mnemlet metadata, FTS, and graph storage."""
 
+import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+from mnemlet.constants import MEMORY_STATUSES
 
 
 SCHEMA = """
@@ -83,6 +86,15 @@ END;
 """
 
 
+INTELLIGENCE_MEMORY_COLUMNS: dict[str, str] = {
+    "memory_type": "TEXT DEFAULT NULL",
+    "type_confidence": "REAL DEFAULT NULL",
+    "type_source": "TEXT DEFAULT NULL",
+    "superseded_by": "TEXT DEFAULT NULL",
+    "content_summary": "TEXT DEFAULT NULL",
+}
+
+
 class MnemletDB:
     """SQLite database for Mnemlet.
 
@@ -103,6 +115,7 @@ class MnemletDB:
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.executescript(SCHEMA)
+        self._ensure_intelligence_schema()
         self._lock = None  # Lock not included by default; add if needed
         self.conn.commit()
 
@@ -112,6 +125,21 @@ class MnemletDB:
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
         return [r[0] for r in rows]
+
+    def _table_columns(self, table_name: str) -> set[str]:
+        """Return column names for a SQLite table."""
+        rows = self.conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        return {str(row[1]) for row in rows}
+
+    def _ensure_intelligence_schema(self) -> None:
+        """Add v0.2 intelligence columns to existing databases idempotently."""
+        columns = self._table_columns("memories")
+        for column_name, column_sql in INTELLIGENCE_MEMORY_COLUMNS.items():
+            if column_name not in columns:
+                self.conn.execute(
+                    f"ALTER TABLE memories ADD COLUMN {column_name} {column_sql}"
+                )
+        self.conn.commit()
 
     def close(self):
         """Close the database connection."""
@@ -136,7 +164,6 @@ class MnemletDB:
         metadata: Optional[dict] = None,
     ) -> dict:
         """Insert a new memory and return its row as dict."""
-        import json
         mid = memory_id or str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         score = importance * 0.5
@@ -160,6 +187,58 @@ class MnemletDB:
             "SELECT * FROM memories WHERE id = ?", (memory_id,)
         ).fetchone()
         return dict(row) if row else None
+
+    def update_memory_status(
+        self,
+        memory_id: str,
+        status: str,
+        superseded_by: str | None = None,
+    ) -> dict | None:
+        """Update a memory status and optional supersession link."""
+        if status not in MEMORY_STATUSES:
+            raise ValueError(f"invalid memory status: {status}")
+        self.conn.execute(
+            "UPDATE memories SET status = ?, superseded_by = COALESCE(?, superseded_by) WHERE id = ?",
+            (status, superseded_by, memory_id),
+        )
+        self.conn.commit()
+        return self.get_memory(memory_id)
+
+    def update_memory_type(
+        self,
+        memory_id: str,
+        memory_type: str,
+        confidence: float,
+        source: str,
+        summary: str | None = None,
+    ) -> dict | None:
+        """Update memory type metadata."""
+        bounded_confidence = max(0.0, min(1.0, confidence))
+        self.conn.execute(
+            """UPDATE memories
+               SET memory_type = ?, type_confidence = ?, type_source = ?, content_summary = ?
+               WHERE id = ?""",
+            (memory_type, bounded_confidence, source, summary, memory_id),
+        )
+        self.conn.commit()
+        return self.get_memory(memory_id)
+
+    def update_memory_metadata(self, memory_id: str, updates: dict[str, Any]) -> dict | None:
+        """Merge updates into a memory's metadata_json object."""
+        memory = self.get_memory(memory_id)
+        if memory is None:
+            return None
+        try:
+            metadata = json.loads(memory.get("metadata_json") or "{}")
+        except json.JSONDecodeError:
+            metadata = {}
+        metadata.update(updates)
+        self.conn.execute(
+            "UPDATE memories SET metadata_json = ? WHERE id = ?",
+            (json.dumps(metadata, ensure_ascii=False), memory_id),
+        )
+        self.conn.commit()
+        return self.get_memory(memory_id)
 
     def _sanitize_fts_query(self, query: str) -> str:
         """Sanitize user input for FTS5 MATCH queries.
