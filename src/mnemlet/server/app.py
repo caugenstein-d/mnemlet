@@ -16,7 +16,7 @@ from mnemlet.engine.ingest import IngestEngine
 from mnemlet.engine.recall import RecallEngine
 from mnemlet.engine.decay import DecayEngine
 from mnemlet.engine.sleep import SleepEngine
-from mnemlet.server.routes import decay, ingest, recall, sleep, status
+from mnemlet.server.routes import context, decay, ingest, recall, sleep, status
 from mnemlet.server.mcp_server import create_mcp_server
 
 
@@ -136,6 +136,7 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         response = await call_next(request)
         return response
 
+    app.include_router(context.router)
     app.include_router(decay.router)
     app.include_router(ingest.router)
     app.include_router(recall.router)

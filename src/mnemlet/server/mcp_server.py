@@ -31,6 +31,26 @@ def create_mcp_server(app_state) -> FastMCP:
         return {"results": results, "count": len(results)}
 
     @mcp.tool()
+    async def mnemlet_context(
+        query: str,
+        namespace: str = None,
+        limit: int = 5,
+        include_superseded: bool = False,
+    ) -> dict:
+        """Retrieve an agent-friendly Context Pack with abstention metadata."""
+        from mnemlet.intelligence.context_pack import build_context_pack
+        from mnemlet.intelligence.policy import recall_statuses
+
+        engine = app_state.recall_engine
+        results = engine.recall(
+            query=query,
+            namespace=namespace,
+            limit=min(limit, 10),
+            include_statuses=recall_statuses(include_superseded=include_superseded),
+        )
+        return build_context_pack(query, results, include_superseded=include_superseded)
+
+    @mcp.tool()
     async def mnemlet_search(
         query: str,
         namespaces: str = None,
