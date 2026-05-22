@@ -52,3 +52,47 @@ def test_recall_empty_result(engine):
     """Recall returns empty list for unmatched query (with min_score threshold)."""
     results = engine.recall(query="quantum physics neutrino", namespace="preferences", limit=5, min_score=0.3)
     assert len(results) == 0
+
+
+def test_recall_excludes_superseded_memories_by_default(embedder):
+    """Legacy recall must not return superseded memories as active facts."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        db = MnemletDB(base / "test.db")
+        chroma = MnemletChroma(base / "chroma", embedder)
+        ingest = IngestEngine(db=db, chroma=chroma, embedder=embedder)
+        recall = RecallEngine(db=db, chroma=chroma, embedder=embedder)
+
+        old = ingest.ingest("The service runs on port 8080", namespace="infra")
+        ingest.ingest("The service runs on port 9090", namespace="infra")
+        db.update_memory_status(str(old["memory_id"]), "superseded")
+
+        results = recall.recall("What port does the service run on?", namespace="infra", limit=5)
+
+        assert all(item["id"] != old["memory_id"] for item in results)
+        assert all(item["status"] == "active" for item in results)
+
+
+def test_recall_includes_minimal_provenance(embedder):
+    """Legacy recall results expose additive provenance without breaking content/score."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        db = MnemletDB(base / "test.db")
+        chroma = MnemletChroma(base / "chroma", embedder)
+        ingest = IngestEngine(db=db, chroma=chroma, embedder=embedder)
+        recall = RecallEngine(db=db, chroma=chroma, embedder=embedder)
+
+        ingest.ingest("Christoph prefers self-hosted tools", namespace="preferences")
+
+        results = recall.recall("self hosted tools", namespace="preferences", limit=5)
+
+        assert results
+        first = results[0]
+        assert first["content"]
+        assert first["score"] >= 0
+        assert first["namespace"] == "preferences"
+        assert first["source"] in {"vector", "fts", "hybrid"}
+        assert first["rank"] == 1
+        assert first["status"] == "active"
+        assert "created_at" in first
+        assert "access_count" in first

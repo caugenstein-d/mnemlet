@@ -188,6 +188,17 @@ class MnemletDB:
         ).fetchone()
         return dict(row) if row else None
 
+    def get_memories_by_ids(self, memory_ids: list[str]) -> dict[str, dict]:
+        """Return memories keyed by ID for the provided IDs."""
+        if not memory_ids:
+            return {}
+        bind_marks = ",".join("?" for _ in memory_ids)
+        rows = self.conn.execute(
+            f"SELECT * FROM memories WHERE id IN ({bind_marks})",
+            tuple(memory_ids),
+        ).fetchall()
+        return {str(row["id"]): dict(row) for row in rows}
+
     def update_memory_status(
         self,
         memory_id: str,

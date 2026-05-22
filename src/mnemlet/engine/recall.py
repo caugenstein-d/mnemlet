@@ -1,8 +1,14 @@
 """Recall pipeline: embed → hybrid search → filter → return."""
 
 from typing import Optional
-from mnemlet.constants import (DEFAULT_TOP_N, MAX_TOP_N, HYBRID_BM25_WEIGHT,
-                              HYBRID_VECTOR_WEIGHT, MAX_RECALL_TOKENS)
+from mnemlet.constants import (
+    DEFAULT_TOP_N,
+    HYBRID_BM25_WEIGHT,
+    HYBRID_VECTOR_WEIGHT,
+    MAX_RECALL_TOKENS,
+    MAX_TOP_N,
+    MEMORY_STATUS_ACTIVE,
+)
 from mnemlet.engine.decay import DecayEngine
 
 
@@ -21,6 +27,7 @@ class RecallEngine:
         namespace: Optional[str] = None,
         limit: int = DEFAULT_TOP_N,
         min_score: float = 0.0,
+        include_statuses: set[str] | None = None,
     ) -> list[dict]:
         """Recall memories relevant to the query."""
         limit = min(limit, MAX_TOP_N)
@@ -28,8 +35,11 @@ class RecallEngine:
         vector_results = self._vector_search(query, namespace, limit * 2)
         fts_results = self._fts_search(query, namespace, limit * 2)
 
-        merged = self._merge_results(vector_results, fts_results, limit)
-        filtered = [m for m in merged if m["score"] >= min_score]
+        merged = self._merge_results(vector_results, fts_results, limit * 2)
+        enriched = self._attach_memory_rows(merged, include_statuses or {MEMORY_STATUS_ACTIVE})
+        filtered = [m for m in enriched if m["score"] >= min_score]
+        for index, item in enumerate(filtered, start=1):
+            item["rank"] = index
 
         # Enforce recall token budget
         total_tokens = 0
@@ -91,19 +101,80 @@ class RecallEngine:
             return []
 
     def _merge_results(self, vector: list[dict], fts: list[dict], limit: int) -> list[dict]:
-        """Merge vector and FTS results, weighted, deduplicated."""
-        scored = {}
+        """Merge vector and FTS results, weighted, deduplicated, and source-aware."""
+        scored: dict[str, dict] = {}
 
         for item in vector:
             sid = item["id"]
-            scored[sid] = scored.get(sid, {"id": sid, "content": item["content"],
-                "namespace": item["namespace"], "score": 0.0})
+            scored[sid] = scored.get(
+                sid,
+                {
+                    "id": sid,
+                    "content": item["content"],
+                    "namespace": item["namespace"],
+                    "score": 0.0,
+                    "source": "vector",
+                    "vector_seen": False,
+                    "fts_seen": False,
+                },
+            )
             scored[sid]["score"] += HYBRID_VECTOR_WEIGHT * item["score"]
+            scored[sid]["vector_seen"] = True
+            scored[sid]["content"] = item["content"] or scored[sid]["content"]
 
         for item in fts:
             sid = item["id"]
-            scored[sid] = scored.get(sid, {"id": sid, "content": item["content"],
-                "namespace": item["namespace"], "score": 0.0})
+            scored[sid] = scored.get(
+                sid,
+                {
+                    "id": sid,
+                    "content": item["content"],
+                    "namespace": item["namespace"],
+                    "score": 0.0,
+                    "source": "fts",
+                    "vector_seen": False,
+                    "fts_seen": False,
+                },
+            )
             scored[sid]["score"] += HYBRID_BM25_WEIGHT * item["score"]
+            scored[sid]["fts_seen"] = True
+            if not scored[sid].get("content"):
+                scored[sid]["content"] = item["content"]
+
+        for item in scored.values():
+            vector_seen = bool(item.pop("vector_seen"))
+            fts_seen = bool(item.pop("fts_seen"))
+            if vector_seen and fts_seen:
+                item["source"] = "hybrid"
+            elif item.get("source") not in {"vector", "fts"}:
+                item["source"] = "vector"
 
         return sorted(scored.values(), key=lambda x: x["score"], reverse=True)[:limit]
+
+    def _attach_memory_rows(self, items: list[dict], include_statuses: set[str]) -> list[dict]:
+        """Attach SQLite memory metadata and filter by status."""
+        memory_rows = self.db.get_memories_by_ids([str(item["id"]) for item in items])
+        enriched: list[dict] = []
+        for item in items:
+            memory = memory_rows.get(str(item["id"]))
+            if memory is None:
+                continue
+            status = str(memory.get("status", "active"))
+            if status not in include_statuses:
+                continue
+            merged = dict(item)
+            merged.update(
+                {
+                    "namespace": memory.get("namespace", item.get("namespace", "")),
+                    "status": status,
+                    "created_at": memory.get("created_at"),
+                    "access_count": memory.get("access_count", 0),
+                    "memory_type": memory.get("memory_type"),
+                    "type_confidence": memory.get("type_confidence"),
+                    "type_source": memory.get("type_source"),
+                    "superseded_by": memory.get("superseded_by"),
+                    "metadata_json": memory.get("metadata_json", "{}"),
+                }
+            )
+            enriched.append(merged)
+        return enriched
