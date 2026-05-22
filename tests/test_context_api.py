@@ -61,3 +61,70 @@ async def test_context_endpoint_abstains_without_results() -> None:
     data = resp.json()
     assert data["context_pack"] == {"primary": [], "supporting": [], "superseded": []}
     assert data["abstention"]["reason"] == "no_relevant_memories"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"query": "", "namespace": "prefs", "limit": 5},
+        {"query": "valid", "namespace": "prefs", "limit": 0},
+        {"query": "valid", "namespace": "prefs", "limit": 11},
+        {"query": "valid", "namespace": "prefs", "limit": 5, "min_score": -0.1},
+        {"query": "valid", "namespace": "prefs", "limit": 5, "min_score": 1.5},
+    ],
+)
+async def test_context_endpoint_rejects_invalid_bounds(payload: dict) -> None:
+    async with _client() as client:
+        resp = await client.post("/api/v1/context", json=payload)
+
+    assert resp.status_code == 422, (
+        f"expected 422 for payload {payload!r}, got {resp.status_code}: {resp.text}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_context_endpoint_include_superseded_toggle() -> None:
+    async with _client() as client:
+        ingest_resp = await client.post(
+            "/api/v1/ingest",
+            json={
+                "content": "Christoph prefers self-hosted tools",
+                "namespace": "prefs",
+                "importance": 0.9,
+            },
+        )
+        assert ingest_resp.status_code == 200
+        memory_id = ingest_resp.json()["memory_id"]
+
+        # Mark the memory as superseded via direct DB access on the running app.
+        db = client._transport.app.state.db
+        updated = db.update_memory_status(memory_id, "superseded")
+        assert updated is not None and updated["status"] == "superseded"
+
+        included = await client.post(
+            "/api/v1/context",
+            json={
+                "query": "self hosted tools",
+                "namespace": "prefs",
+                "limit": 5,
+                "include_superseded": True,
+            },
+        )
+        excluded = await client.post(
+            "/api/v1/context",
+            json={
+                "query": "self hosted tools",
+                "namespace": "prefs",
+                "limit": 5,
+            },
+        )
+
+    assert included.status_code == 200
+    included_data = included.json()
+    superseded_ids = [item["id"] for item in included_data["context_pack"]["superseded"]]
+    assert memory_id in superseded_ids
+
+    assert excluded.status_code == 200
+    excluded_data = excluded.json()
+    assert excluded_data["context_pack"]["superseded"] == []

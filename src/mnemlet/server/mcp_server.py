@@ -35,6 +35,7 @@ def create_mcp_server(app_state) -> FastMCP:
         query: str,
         namespace: str = None,
         limit: int = 5,
+        min_score: float = 0.0,
         include_superseded: bool = False,
     ) -> dict:
         """Retrieve an agent-friendly Context Pack with abstention metadata."""
@@ -46,6 +47,7 @@ def create_mcp_server(app_state) -> FastMCP:
             query=query,
             namespace=namespace,
             limit=min(limit, 10),
+            min_score=min_score,
             include_statuses=recall_statuses(include_superseded=include_superseded),
         )
         return build_context_pack(query, results, include_superseded=include_superseded)
