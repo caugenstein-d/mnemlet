@@ -96,3 +96,94 @@ def test_recall_includes_minimal_provenance(embedder):
         assert first["status"] == "active"
         assert "created_at" in first
         assert "access_count" in first
+
+
+def test_merge_results_marks_hybrid_sources():
+    """Overlapping vector and FTS hits are labeled hybrid without changing solo sources."""
+    recall = RecallEngine(db=None, chroma=None, embedder=None)
+
+    results = recall._merge_results(
+        vector=[
+            {"id": "both", "content": "shared", "score": 0.9, "namespace": "test"},
+            {"id": "vector-only", "content": "vector", "score": 0.8, "namespace": "test"},
+        ],
+        fts=[
+            {"id": "both", "content": "shared", "score": 0.5, "namespace": "test"},
+            {"id": "fts-only", "content": "fts", "score": 0.5, "namespace": "test"},
+        ],
+        limit=10,
+    )
+
+    by_id = {item["id"]: item for item in results}
+    assert by_id["both"]["source"] == "hybrid"
+    assert by_id["vector-only"]["source"] == "vector"
+    assert by_id["fts-only"]["source"] == "fts"
+
+
+def test_recall_respects_explicit_empty_status_set(engine):
+    """An explicit empty status set returns no memories instead of defaulting to active."""
+    results = engine.recall(
+        "dark mode editor",
+        namespace="preferences",
+        include_statuses=set(),
+    )
+
+    assert results == []
+
+
+def test_recall_overfetches_when_superseded_candidates_crowd_active_results():
+    """Recall fetches enough candidates before status filtering to avoid active starvation."""
+
+    class FakeChroma:
+        def __init__(self):
+            self.docs = [
+                {"id": f"old-{index}", "content": f"old memory {index}", "distance": 0.01 * index}
+                for index in range(1, 5)
+            ] + [
+                {"id": "active-1", "content": "active memory 1", "distance": 0.50},
+                {"id": "active-2", "content": "active memory 2", "distance": 0.51},
+            ]
+
+        def query(self, query_text, n_results, where=None):
+            selected = self.docs[:n_results]
+            return {
+                "ids": [[item["id"] for item in selected]],
+                "documents": [[item["content"] for item in selected]],
+                "distances": [[item["distance"] for item in selected]],
+                "metadatas": [[{"namespace": "test"} for _ in selected]],
+            }
+
+    class FakeDB:
+        def get_memories_by_ids(self, memory_ids):
+            rows = {}
+            for memory_id in memory_ids:
+                status = "active" if memory_id.startswith("active") else "superseded"
+                rows[memory_id] = {
+                    "id": memory_id,
+                    "namespace": "test",
+                    "status": status,
+                    "created_at": "2026-05-22T00:00:00+00:00",
+                    "access_count": 0,
+                    "memory_type": None,
+                    "type_confidence": None,
+                    "type_source": None,
+                    "superseded_by": None,
+                    "metadata_json": "{}",
+                }
+            return rows
+
+        def search_fts(self, query, namespace=None, limit=5):
+            return []
+
+        def record_interaction(self, memory_id, interaction_type, agent_id):
+            return None
+
+    class FakeEmbedder:
+        def count_tokens(self, content):
+            return 1
+
+    recall = RecallEngine(db=FakeDB(), chroma=FakeChroma(), embedder=FakeEmbedder())
+
+    results = recall.recall("query", namespace="test", limit=2)
+
+    assert [item["id"] for item in results] == ["active-1", "active-2"]

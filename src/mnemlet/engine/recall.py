@@ -31,12 +31,14 @@ class RecallEngine:
     ) -> list[dict]:
         """Recall memories relevant to the query."""
         limit = min(limit, MAX_TOP_N)
+        candidate_limit = max(limit * 4, MAX_TOP_N * 2)
+        statuses = include_statuses if include_statuses is not None else {MEMORY_STATUS_ACTIVE}
 
-        vector_results = self._vector_search(query, namespace, limit * 2)
-        fts_results = self._fts_search(query, namespace, limit * 2)
+        vector_results = self._vector_search(query, namespace, candidate_limit)
+        fts_results = self._fts_search(query, namespace, candidate_limit)
 
-        merged = self._merge_results(vector_results, fts_results, limit * 2)
-        enriched = self._attach_memory_rows(merged, include_statuses or {MEMORY_STATUS_ACTIVE})
+        merged = self._merge_results(vector_results, fts_results, candidate_limit)
+        enriched = self._attach_memory_rows(merged, statuses)
         filtered = [m for m in enriched if m["score"] >= min_score]
         for index, item in enumerate(filtered, start=1):
             item["rank"] = index
