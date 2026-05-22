@@ -3,6 +3,7 @@
 import hashlib
 from typing import Optional
 from mnemlet.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD
+from mnemlet.intelligence.classifier import classify_memory
 
 
 class IngestEngine:
@@ -49,6 +50,15 @@ class IngestEngine:
                 importance=importance,
                 metadata=metadata,
             )
+            classification = classify_memory(chunk, namespace)
+            self.db.update_memory_type(
+                memory_id,
+                classification.memory_type,
+                classification.confidence,
+                classification.source,
+                classification.summary,
+            )
+            db_result = self.db.get_memory(memory_id) or db_result
 
             self.chroma.add(
                 doc_id=memory_id,

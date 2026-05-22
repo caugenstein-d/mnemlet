@@ -59,3 +59,18 @@ def test_ingest_long_content_is_chunked(engine):
         namespace="test",
     )
     assert result["chunk_count"] >= 2
+
+
+def test_ingest_classifies_memory_heuristically(engine):
+    """New memories receive a deterministic MVP memory type."""
+    result = engine.ingest(
+        content="Christoph bevorzugt Self-Hosting für Agent Memory",
+        namespace="preferences",
+        importance=0.8,
+    )
+
+    memory = engine.db.get_memory(result["memory_id"])
+
+    assert memory["memory_type"] == "preference"
+    assert memory["type_source"] == "heuristic"
+    assert memory["type_confidence"] >= 0.7
