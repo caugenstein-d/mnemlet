@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from mnemlet.constants import MEMORY_STATUSES
+from mnemlet.constants import MEMORY_STATUSES, MEMORY_TYPES
 
 
 SCHEMA = """
@@ -194,7 +194,7 @@ class MnemletDB:
         status: str,
         superseded_by: str | None = None,
     ) -> dict | None:
-        """Update a memory status and optional supersession link."""
+        """Update status, preserving existing supersession link when omitted."""
         if status not in MEMORY_STATUSES:
             raise ValueError(f"invalid memory status: {status}")
         self.conn.execute(
@@ -213,6 +213,8 @@ class MnemletDB:
         summary: str | None = None,
     ) -> dict | None:
         """Update memory type metadata."""
+        if memory_type not in MEMORY_TYPES:
+            raise ValueError(f"invalid memory type: {memory_type}")
         bounded_confidence = max(0.0, min(1.0, confidence))
         self.conn.execute(
             """UPDATE memories

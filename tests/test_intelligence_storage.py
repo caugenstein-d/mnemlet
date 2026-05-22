@@ -1,7 +1,10 @@
 """Tests for intelligence schema migrations and storage helpers."""
 
+import json
 import sqlite3
 from pathlib import Path
+
+import pytest
 
 from mnemlet.storage.sqlite import MnemletDB
 
@@ -77,5 +80,32 @@ def test_memory_status_type_and_metadata_helpers(tmp_path: Path) -> None:
     assert updated["content_summary"] == "Service port"
     assert updated["status"] == "superseded"
     assert updated["superseded_by"] == "new-id"
-    assert '"supersedes": "old-id"' in updated["metadata_json"]
-    assert '"policy_flags": ["checked"]' in updated["metadata_json"]
+    metadata = json.loads(updated["metadata_json"])
+    assert metadata["supersedes"] == "old-id"
+    assert metadata["policy_flags"] == ["checked"]
+
+
+def test_update_memory_type_rejects_invalid_type(tmp_path: Path) -> None:
+    db = MnemletDB(tmp_path / "mnemlet.db")
+    try:
+        memory = db.insert_memory(content_preview="The service runs on port 4050", namespace="infra")
+
+        with pytest.raises(ValueError, match="invalid memory type: nonsense"):
+            db.update_memory_type(memory["id"], "nonsense", 0.5, "heuristic")
+    finally:
+        db.close()
+
+
+def test_update_memory_status_preserves_superseded_link_when_not_replaced(tmp_path: Path) -> None:
+    db = MnemletDB(tmp_path / "mnemlet.db")
+    try:
+        memory = db.insert_memory(content_preview="The service runs on port 4050", namespace="infra")
+
+        db.update_memory_status(memory["id"], "superseded", superseded_by="new-id")
+        updated = db.update_memory_status(memory["id"], "forgotten")
+    finally:
+        db.close()
+
+    assert updated is not None
+    assert updated["status"] == "forgotten"
+    assert updated["superseded_by"] == "new-id"
