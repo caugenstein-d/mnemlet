@@ -59,3 +59,37 @@ def test_context_pack_flags_contradictory_results() -> None:
 
     assert pack["abstention"]["reason"] == "contradictory_results"
     assert "contradiction_unresolved" in pack["meta"]["policy_flags"]
+
+
+def test_context_pack_extracts_policy_flags_from_metadata_json() -> None:
+    results = [
+        {
+            "id": "a",
+            "content": "active contradiction",
+            "score": 0.8,
+            "status": "active",
+            "source": "vector",
+            "rank": 1,
+            "namespace": "n",
+            "created_at": "now",
+            "metadata_json": '{"policy_flags": ["contradiction_unresolved"]}',
+        }
+    ]
+
+    pack = build_context_pack("query", results)
+
+    assert pack["meta"]["policy_flags"] == ["contradiction_unresolved"]
+    assert pack["abstention"]["reason"] == "contradictory_results"
+    assert pack["context_pack"]["primary"][0]["provenance"]["policy_flags"] == ["contradiction_unresolved"]
+
+
+def test_context_pack_abstains_when_only_inactive_results_match() -> None:
+    results = [
+        {"id": "d", "content": "old", "score": 0.9, "status": "superseded", "source": "hybrid", "rank": 1, "namespace": "n", "created_at": "now"}
+    ]
+
+    pack = build_context_pack("query", results)
+
+    assert pack["context_pack"] == {"primary": [], "supporting": [], "superseded": []}
+    assert pack["meta"]["pack_size"] == 0
+    assert pack["abstention"]["reason"] == "all_results_filtered"
