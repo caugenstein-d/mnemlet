@@ -10,11 +10,12 @@ from mnemlet.intelligence.classifier import classify_memory
 class IngestEngine:
     """Handles memory ingestion: chunking, dedup, and storage."""
 
-    def __init__(self, db, chroma, embedder, vault=None):
+    def __init__(self, db, chroma, embedder, vault=None, supersession_engine=None):
         self.db = db
         self.chroma = chroma
         self.embedder = embedder
         self.vault = vault
+        self.supersession_engine = supersession_engine
 
     def ingest(
         self,
@@ -33,6 +34,7 @@ class IngestEngine:
         chunks = self._chunk(content)
 
         results = []
+        all_superseded_ids: list[str] = []
         for i, chunk in enumerate(chunks):
             if dedup:
                 memory_id = self._content_id(chunk, namespace)
@@ -50,6 +52,8 @@ class IngestEngine:
                         "namespace": namespace,
                         "retention_score": existing["retention_score"],
                         "chunk_count": 1,
+                        "superseded_ids": [],
+                        "contradiction_detected": False,
                     }
 
             db_result = self.db.insert_memory(
@@ -101,6 +105,13 @@ class IngestEngine:
                     metadata=metadata,
                 )
 
+            superseded_ids: list[str] = []
+            if self.supersession_engine is not None:
+                superseded_ids = self.supersession_engine.process_new_memory(db_result, chunk)
+                if superseded_ids:
+                    db_result = self.db.get_memory(memory_id) or db_result
+                all_superseded_ids.extend(superseded_ids)
+
             results.append(memory_id)
 
         return {
@@ -110,6 +121,8 @@ class IngestEngine:
             "namespace": namespace,
             "retention_score": importance * 0.5,
             "chunk_count": len(results),
+            "superseded_ids": all_superseded_ids,
+            "contradiction_detected": bool(all_superseded_ids),
         }
 
     def _chunk(self, content: str, max_tokens: int = MAX_CHUNK_TOKENS) -> list[str]:
