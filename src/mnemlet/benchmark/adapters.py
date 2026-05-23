@@ -82,13 +82,18 @@ def check_mcp_tool_listing(list_tools: ListTools) -> dict[str, Any]:
     return {"name": "mcp_tool_listing", "surface": "mcp", "success": success}
 
 
-def check_openwebui_filter_inlet(path: Path, expected_text: str = "Nebelkrähe") -> dict[str, Any]:
+def check_openwebui_filter_inlet(
+    path: Path,
+    expected_text: str = "Nebelkrähe",
+    fake_response: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Load an OpenWebUI filter and verify inlet context injection with fake recall."""
     try:
         module = _load_python_module(path, "mnemlet_valve_benchmark_inlet")
-        module._post_json = lambda route, payload, timeout: {  # type: ignore[attr-defined]
+        response = fake_response if fake_response is not None else {
             "results": [{"namespace": "integration/sentinel", "content": expected_text}]
         }
+        module._post_json = lambda route, payload, timeout: response  # type: ignore[attr-defined]
         body = {"messages": [{"role": "user", "content": "What is the codename?"}]}
         returned = module.Filter().inlet(body)
         messages = returned.get("messages", [])
