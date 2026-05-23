@@ -1,8 +1,9 @@
 """Ingest pipeline: chunk → embed → dedup → store."""
 
 import hashlib
+import uuid
 from typing import Optional
-from mnemlet.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD
+from mnemlet.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD, MEMORY_TYPES
 from mnemlet.intelligence.classifier import classify_memory
 
 
@@ -26,11 +27,17 @@ class IngestEngine:
         type_source: str | None = None,
     ) -> dict:
         """Ingest a memory: chunk, dedup, embed, store. Return result."""
+        if memory_type is not None and memory_type not in MEMORY_TYPES:
+            raise ValueError(f"invalid memory type: {memory_type}")
+
         chunks = self._chunk(content)
 
         results = []
         for i, chunk in enumerate(chunks):
-            memory_id = self._content_id(chunk, namespace)
+            if dedup:
+                memory_id = self._content_id(chunk, namespace)
+            else:
+                memory_id = uuid.uuid4().hex[:32]
             content_hash = hashlib.sha256(chunk.encode()).hexdigest()
 
             if dedup and i == 0 and len(chunks) == 1 and self._is_duplicate(chunk, namespace):

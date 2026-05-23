@@ -67,3 +67,24 @@ def test_confirm_boosts_retention_and_records_interaction(review: ReviewService)
 
     assert confirmed["retention_score"] > before
     assert any(item["interaction_type"] == "confirm" for item in interactions)
+
+
+def test_remember_bypasses_duplicate_suppression(review: ReviewService) -> None:
+    first = review.remember("Identical content here", "x", 0.5)
+    second = review.remember("Identical content here", "x", 0.5)
+
+    assert first["stored"] is True
+    assert second["stored"] is True
+    assert first["memory_id"] != second["memory_id"]
+    assert review.db.get_memory(str(first["memory_id"])) is not None
+    assert review.db.get_memory(str(second["memory_id"])) is not None
+
+
+def test_remember_rejects_invalid_memory_type(review: ReviewService) -> None:
+    with pytest.raises(ValueError):
+        review.remember("content", "x", 0.5, "garbage")
+
+    count = review.db.conn.execute(
+        "SELECT COUNT(*) FROM memories WHERE namespace = 'x'"
+    ).fetchone()[0]
+    assert count == 0

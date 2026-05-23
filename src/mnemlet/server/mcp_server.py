@@ -67,6 +67,10 @@ def create_mcp_server(app_state) -> FastMCP:
         memory_type: str = None,
     ) -> dict:
         """Deliberately store a memory, optionally with explicit type."""
+        if memory_type is not None:
+            from mnemlet.constants import MEMORY_TYPES
+            if memory_type not in MEMORY_TYPES:
+                raise ValueError(f"invalid memory type: {memory_type}")
         from mnemlet.intelligence.review import ReviewService
 
         return ReviewService(app_state.db, app_state.ingest_engine).remember(content, namespace, importance, memory_type)

@@ -2,22 +2,38 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
+from mnemlet.constants import (
+    MEMORY_TYPE_CONTEXT,
+    MEMORY_TYPE_EVENT,
+    MEMORY_TYPE_FACT,
+    MEMORY_TYPE_INSTRUCTION,
+    MEMORY_TYPE_PREFERENCE,
+)
 from mnemlet.intelligence.review import ReviewService
 
 
 router = APIRouter(prefix="/api/v1", tags=["review"])
 
 
+MemoryTypeLiteral = Literal[
+    MEMORY_TYPE_CONTEXT,
+    MEMORY_TYPE_EVENT,
+    MEMORY_TYPE_FACT,
+    MEMORY_TYPE_INSTRUCTION,
+    MEMORY_TYPE_PREFERENCE,
+]
+
+
 class RememberRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=100000)
     namespace: str = Field(default="default", max_length=256)
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
-    memory_type: Optional[str] = None
+    memory_type: Optional[MemoryTypeLiteral] = None
 
 
 class ReplaceRequest(BaseModel):
