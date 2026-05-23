@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -35,6 +36,8 @@ class SupersessionEngine:
 
     def process_new_memory(self, new_memory: dict, new_content: str) -> list[str]:
         """Check active same-namespace candidates and supersede or flag contradictions."""
+        if self._has_explicit_supersede(new_memory):
+            return []
         candidates = self._active_candidates(new_memory)
         superseded_ids: list[str] = []
         for candidate in candidates:
@@ -67,15 +70,49 @@ class SupersessionEngine:
         return [dict(row) for row in rows]
 
     def _flag_unresolved(self, old_id: str, new_id: str) -> None:
-        self.db.update_memory_metadata(
-            old_id,
-            {"contradicts_with": [new_id], "policy_flags": ["supersede_protected"]},
-        )
-        self.db.update_memory_metadata(
-            new_id,
-            {"contradicts_with": [old_id], "policy_flags": ["contradiction_unresolved"]},
-        )
+        self._merge_unresolved_flags(old_id, new_id, "supersede_protected")
+        self._merge_unresolved_flags(new_id, old_id, "contradiction_unresolved")
         self.db.record_interaction(new_id, "contradiction_detected", agent_id="api")
+
+    def _merge_unresolved_flags(self, target_id: str, other_id: str, flag: str) -> None:
+        """Idempotently union ``contradicts_with`` and ``policy_flags`` lists.
+
+        ``update_memory_metadata`` performs a shallow merge that would clobber
+        list-valued fields if called multiple times. Reading first and merging
+        lets multiple contradictions accumulate against the same memory.
+        """
+        memory = self.db.get_memory(target_id)
+        if memory is None:
+            return
+        try:
+            metadata = json.loads(memory.get("metadata_json") or "{}")
+        except json.JSONDecodeError:
+            metadata = {}
+        contradicts = list(metadata.get("contradicts_with") or [])
+        if other_id not in contradicts:
+            contradicts.append(other_id)
+        flags = list(metadata.get("policy_flags") or [])
+        if flag not in flags:
+            flags.append(flag)
+        self.db.update_memory_metadata(
+            target_id,
+            {"contradicts_with": contradicts, "policy_flags": flags},
+        )
+
+    def _has_explicit_supersede(self, new_memory: dict) -> bool:
+        """Return True when the operator already set ``supersede_reason``.
+
+        Manual replace/merge flows pass an explicit ``supersede_reason``. The
+        engine must not overwrite that trail with an auto-derived decision.
+        """
+        raw = new_memory.get("metadata_json")
+        if not isinstance(raw, str):
+            return False
+        try:
+            metadata = json.loads(raw or "{}")
+        except json.JSONDecodeError:
+            return False
+        return "supersede_reason" in metadata
 
 
 class LLMContradictionDetector:
@@ -85,11 +122,14 @@ class LLMContradictionDetector:
         self.llm_backend = llm_backend
 
     def detect(self, new_content: str, existing_content: str) -> ContradictionDecision:
+        # Fix 3 / Option A: LLMBackend.detect_contradiction does not return a
+        # ``confidence`` field, so default to a usable value when the LLM
+        # signals a contradiction. Without this, raw.get("confidence", 0.0)
+        # would always be 0.0 and the LLM path could never auto-supersede.
         if not self.llm_backend.available:
             return ContradictionDecision(False, 0.0, "llm unavailable")
         raw = self.llm_backend.detect_contradiction(new_content, existing_content)
-        return ContradictionDecision(
-            bool(raw.get("contradiction", False)),
-            float(raw.get("confidence", 0.0)),
-            str(raw.get("explanation", "")),
-        )
+        contradiction = bool(raw.get("contradiction", False))
+        confidence = float(raw.get("confidence", 0.85 if contradiction else 0.0))
+        explanation = str(raw.get("explanation", ""))
+        return ContradictionDecision(contradiction, confidence, explanation)
