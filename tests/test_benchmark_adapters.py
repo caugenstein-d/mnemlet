@@ -129,3 +129,13 @@ def test_opencode_static_accepts_context_pack_ready_plugin(tmp_path: Path) -> No
     result = check_opencode_plugin_static(plugin_path)
 
     assert result["success"] is True
+
+
+def test_run_adapter_checks_accepts_repo_local_openwebui_fixture() -> None:
+    filter_path = Path(__file__).parent / "fixtures" / "openwebui" / "mnemlet_valve.py"
+
+    results = run_adapter_checks(openwebui_filter_path=filter_path, opencode_plugin_path=Path("missing.js"))
+
+    result_by_name = {item["name"]: item for item in results}
+    assert result_by_name["openwebui_filter_inlet"]["success"] is True
+    assert result_by_name["openwebui_filter_outlet"]["success"] is True
