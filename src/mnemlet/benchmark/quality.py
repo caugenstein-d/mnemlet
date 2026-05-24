@@ -185,7 +185,6 @@ class QualityRunner:
 
     def _summary(self, scenarios: list[dict[str, Any]]) -> dict[str, float | int]:
         assertions = [assertion for scenario in scenarios for assertion in scenario["assertions"]]
-        passed_assertions = [assertion for assertion in assertions if assertion.get("pass") is True]
         no_hit_assertions = [assertion for assertion in assertions if assertion.get("type") in {"abstention_reason", "abstention_any_of"}]
         provenance_assertions = [assertion for assertion in assertions if assertion.get("type") == "provenance_fields"]
         status_assertions = [assertion for assertion in assertions if assertion.get("type") == "status"]

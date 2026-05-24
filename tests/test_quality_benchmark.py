@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from mnemlet.benchmark.datasets import load_quality_dataset
+from mnemlet.benchmark.quality import run_quality_benchmark
 
 
 def test_load_public_quality_dataset() -> None:
@@ -20,10 +21,6 @@ def test_load_public_quality_dataset() -> None:
         "openwebui_integration_quality",
         "opencode_integration_quality",
     }
-
-
-from mnemlet.benchmark.quality import run_quality_benchmark
-
 
 def test_run_quality_benchmark_returns_release_metrics(tmp_path: Path) -> None:
     dataset = load_quality_dataset("public", root=Path.cwd())
