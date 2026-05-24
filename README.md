@@ -12,7 +12,7 @@ Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](htt
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Pi-Tested](https://img.shields.io/badge/pi--tested-RPi%205%2016GB-brightgreen)](https://www.raspberrypi.com/)
-[![Tests](https://img.shields.io/badge/tests-190%20passed-brightgreen)]()
+[![Tests](https://github.com/christoph/mnemlet/actions/workflows/test.yml/badge.svg)](https://github.com/christoph/mnemlet/actions/workflows/test.yml)
 [![Demo](https://img.shields.io/badge/demo-asciinema-ff69b4)](scripts/demo.cast)
 [![Website](https://img.shields.io/badge/web-mnemlet.dev-22C55E)](https://christoph.github.io/mnemlet)
 
@@ -297,6 +297,12 @@ That's it. No system files, no daemons, no databases left behind. We respect you
 ## Maintainer Statement
 
 I maintain this because I use it daily. It powers my homelab AI stack — OpenWebUI, OpenCode, and OpenClaw on two Raspberry Pi 5s. It lives as long as I use it. Bug reports and pull requests are welcome, but set expectations accordingly: this is a solo-dev, dogfooded project.
+
+---
+
+## Roadmap
+
+Honest forward look in [ROADMAP.md](ROADMAP.md). Short version: v0.3 adds the Trust / Security / Privacy layer (auth, audit log, secret guard, backup/restore).
 
 ---
 
