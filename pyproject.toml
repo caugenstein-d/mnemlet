@@ -1,6 +1,6 @@
 [project]
 name = "mnemlet"
-version = "0.1.0"
+version = "0.2.0"
 description = "Brain-inspired memory engine for your self-hosted AI stack. Runs on a Pi. No cloud, no API keys."
 readme = "README.md"
 license = {text = "MIT"}
