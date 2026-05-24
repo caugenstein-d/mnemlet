@@ -24,7 +24,7 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 
 - 🧠 **Exponential decay + interaction-weighting** — Memories you recall and update stay sharp. What you ignore fades. No infinite hoarding.
 - 😴 **Sleep Engine** — Nightly consolidation runs while you're away: deduplicate, rescore stale memories, cluster related knowledge, and generate a morning briefing. Like your brain during REM sleep.
-- 🔌 **MCP-native with 8 tools** — `mnemlet_ingest`, `mnemlet_recall`, `mnemlet_search`, `mnemlet_status`, `mnemlet_namespaces`, `mnemlet_update`, `mnemlet_decay_config`, `mnemlet_export`. Works with OpenWebUI, OpenClaw, Claude Code, Cursor, or any MCP client.
+- 🔌 **MCP-native with 14 tools** — `mnemlet_ingest`/`mnemlet_recall`/`mnemlet_search` for the basics, `mnemlet_context`/`mnemlet_explain` for context packs with provenance, `mnemlet_remember`/`mnemlet_forget`/`mnemlet_replace`/`mnemlet_confirm` for memory review, plus `mnemlet_status`/`mnemlet_namespaces`/`mnemlet_update`/`mnemlet_decay_config`/`mnemlet_export` for admin. Works with OpenWebUI, OpenClaw, Claude Code, Cursor, or any MCP client.
 - 📂 **Inspectable Markdown vault** — Every memory as a `.md` file with YAML frontmatter. Open in Obsidian. `grep` it. `git` it. No black box database lock-in.
 - 🤖 **Optional local LLM** — Plug in Gemma3:4b via Ollama. Runs CPU-only on a Pi. Enhances sleep consolidation (contradiction detection, summarization).
 - 🔍 **Hybrid search** — BM25 (SQLite FTS5) + vector similarity (ChromaDB). Both local, both free.
@@ -48,7 +48,7 @@ No checkmark bingo. Here's where Mnémlet shines, and where it doesn't.
 | **Inspectable vault** | ✅ (Markdown) | ❌ | ❌ | ⚠️ (beta) | ❌ |
 | **TUI Dashboard** | ❌ | ❌ | ❌ | ✅ | ❌ |
 | **Cloud sync** | ❌ | ✅ | ❌ | ✅ | ✅ |
-| **MCP tools** | 8 | ~10 | 29 | 19 | ❌ (API) |
+| **MCP tools** | 14 | ~10 | 29 | 19 | ❌ (API) |
 | **Language** | Python | Python | Python | Go | HTTP API |
 | **License** | MIT | Apache 2.0 | MIT | MIT | MIT |
 | **Pi-friendly RAM** | ✅ (450 MB) | ❌ | ✅ | ✅ | ❌ |
@@ -64,8 +64,10 @@ If your priority is **local-first, brain-inspired forgetting, sleep consolidatio
 ### Install
 
 ```bash
-pip install mnemlet
+pip install git+https://github.com/christoph/mnemlet.git@v0.2.0
 ```
+
+> PyPI release follows once the Trust/Security/Privacy layer lands in v0.3.
 
 ### Start the server
 
@@ -196,15 +198,21 @@ Every memory is a Markdown file with YAML frontmatter. You can read, edit, versi
 |---|---|---|
 | `/api/v1/health` | GET | Health check |
 | `/api/v1/status` | GET | Memory counts, storage stats, decay info |
+| `/api/v1/vault` | GET | Vault path and file count |
 | `/api/v1/ingest` | POST | Store a memory |
 | `/api/v1/recall` | POST | Retrieve relevant memories |
+| `/api/v1/context` | POST | Build a context pack with abstention reasons |
+| `/api/v1/remember` | POST | Store an intelligence memory with classifier policies |
+| `/api/v1/forget/{memory_id}` | POST | Soft-forget a memory |
+| `/api/v1/replace/{memory_id}` | POST | Replace memory content (preserves provenance) |
+| `/api/v1/confirm/{memory_id}` | POST | Confirm a memory (retention boost) |
+| `/api/v1/explain/{memory_id}` | GET | Explain a memory's provenance and status |
 | `/api/v1/decay/run` | POST | Manual decay run + purge |
-| `/api/v1/namespaces/{ns}/decay` | GET/PUT | Per-namespace decay configuration |
-| `/api/v1/vault` | GET | Vault path and file count |
+| `/api/v1/namespaces/{namespace}/decay` | GET/PUT | Per-namespace decay configuration |
 | `/api/v1/sleep/status` | GET | Sleep engine state |
 | `/api/v1/sleep/start` | POST | Start sleep cycle manually |
 | `/api/v1/sleep/stop` | POST | Stop sleep cycle gracefully |
-| `/mcp` | SSE | MCP server endpoint (8 tools) |
+| `/mcp` | SSE | MCP server endpoint (14 tools) |
 
 ---
 
