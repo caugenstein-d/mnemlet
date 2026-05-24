@@ -113,3 +113,50 @@ def test_quality_runner_reports_missing_memory_for_confirm(tmp_path: Path) -> No
             "real_id": "missing-real-id",
         }
     ]
+
+
+def test_quality_runner_isolates_storage_between_scenarios(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("mnemlet.benchmark.quality.run_adapter_checks", lambda: [])
+    monkeypatch.setattr("mnemlet.benchmark.quality.summarize_adapter_results", lambda _results: {})
+    dataset = _quality_dataset(
+        [
+            _quality_scenario(
+                "writer",
+                [
+                    _phase(
+                        1,
+                        "ingest",
+                        {
+                            "memories": [
+                                {
+                                    "id": "leaky_fact",
+                                    "content": "The temporary codename is Bronze Otter.",
+                                    "namespace": "quality/leak",
+                                    "importance": 0.9,
+                                }
+                            ]
+                        },
+                    )
+                ],
+            ),
+            _quality_scenario(
+                "reader",
+                [
+                    _phase(
+                        1,
+                        "context",
+                        {
+                            "query": "Bronze Otter",
+                            "namespace": "quality/leak",
+                            "min_score": 0.0,
+                            "assert": {"abstention_reason": "no_relevant_memories"},
+                        },
+                    )
+                ],
+            ),
+        ]
+    )
+
+    result = run_quality_benchmark(dataset, output_dir=tmp_path)
+
+    assert result["scenarios"][1]["passed"] is True

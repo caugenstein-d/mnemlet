@@ -65,16 +65,26 @@ class QualityRunner:
             self.db.close()
         if self._temp_dir is not None:
             shutil.rmtree(self._temp_dir, ignore_errors=True)
+        self._temp_dir = None
+        self.db = None
+        self.ingest_engine = None
+        self.recall_engine = None
+        self.review_service = None
 
     def run(self) -> dict[str, Any]:
-        self.setup()
         scenario_results = []
         for scenario in self.dataset.scenarios:
-            assertions = []
-            for phase in scenario.phases:
-                assertions.extend(self._run_phase(phase.action, phase.payload))
-            passed = all(item["pass"] for item in assertions)
-            scenario_results.append({"id": scenario.id, "category": scenario.category, "passed": passed, "assertions": assertions})
+            self.setup()
+            self.logical_ids = {}
+            self.scores_before_confirm = {}
+            try:
+                assertions = []
+                for phase in scenario.phases:
+                    assertions.extend(self._run_phase(phase.action, phase.payload))
+                passed = all(item["pass"] for item in assertions)
+                scenario_results.append({"id": scenario.id, "category": scenario.category, "passed": passed, "assertions": assertions})
+            finally:
+                self.close()
         adapter_results = run_adapter_checks()
         summary = self._summary(scenario_results)
         summary.update(summarize_adapter_results(adapter_results))
