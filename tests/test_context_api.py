@@ -149,3 +149,35 @@ async def test_review_and_explain_routes_roundtrip() -> None:
     assert explain.json()["memory_type"] == "instruction"
     assert forget.status_code == 200
     assert forget.json()["status"] == "forgotten"
+
+
+@pytest.mark.asyncio
+async def test_remember_endpoint_rejects_invalid_memory_type() -> None:
+    async with _client() as client:
+        resp = await client.post(
+            "/api/v1/remember",
+            json={"content": "invalid type", "namespace": "ops", "importance": 0.5, "memory_type": "garbage"},
+        )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method", "path", "payload"),
+    [
+        ("POST", "/api/v1/forget/missing-id", None),
+        ("POST", "/api/v1/confirm/missing-id", None),
+        ("POST", "/api/v1/replace/missing-id", {"new_content": "replacement"}),
+        ("GET", "/api/v1/explain/missing-id", None),
+    ],
+)
+async def test_review_routes_return_404_for_missing_memory(method: str, path: str, payload: dict | None) -> None:
+    async with _client() as client:
+        if method == "POST":
+            resp = await client.post(path, json=payload)
+        else:
+            resp = await client.get(path)
+
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["detail"].lower()

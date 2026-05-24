@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from mnemlet.constants import (
@@ -45,6 +45,13 @@ def _review_service(request: Request) -> ReviewService:
     return ReviewService(request.app.state.db, request.app.state.ingest_engine)
 
 
+def _raise_not_found_on_error(result: dict) -> dict:
+    error = result.get("error")
+    if isinstance(error, str):
+        raise HTTPException(status_code=404, detail=error)
+    return result
+
+
 @router.post("/remember")
 async def remember_memory(req: RememberRequest, request: Request) -> dict:
     return _review_service(request).remember(req.content, req.namespace, req.importance, req.memory_type)
@@ -52,14 +59,14 @@ async def remember_memory(req: RememberRequest, request: Request) -> dict:
 
 @router.post("/forget/{memory_id}")
 async def forget_memory(memory_id: str, request: Request) -> dict:
-    return _review_service(request).forget(memory_id)
+    return _raise_not_found_on_error(_review_service(request).forget(memory_id))
 
 
 @router.post("/replace/{memory_id}")
 async def replace_memory(memory_id: str, req: ReplaceRequest, request: Request) -> dict:
-    return _review_service(request).replace(memory_id, req.new_content, req.importance)
+    return _raise_not_found_on_error(_review_service(request).replace(memory_id, req.new_content, req.importance))
 
 
 @router.post("/confirm/{memory_id}")
 async def confirm_memory(memory_id: str, request: Request) -> dict:
-    return _review_service(request).confirm(memory_id)
+    return _raise_not_found_on_error(_review_service(request).confirm(memory_id))
