@@ -184,6 +184,9 @@ def _markdown_cell(value: Any) -> str:
 
 
 def _write_csv(result: dict[str, Any], path: Path) -> None:
+    if result.get("mode") == "quality":
+        _write_quality_csv(result, path)
+        return
     fields = [
         "query_id",
         "case_id",
@@ -206,6 +209,25 @@ def _write_csv(result: dict[str, Any], path: Path) -> None:
                     "returned_logical_ids": ";".join(_returned_logical_ids(query)),
                 }
             )
+
+
+def _write_quality_csv(result: dict[str, Any], path: Path) -> None:
+    fields = ["scenario_id", "category", "passed", "assertion_type", "assertion_pass"]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for scenario in result.get("scenarios", []):
+            assertions = scenario.get("assertions", []) or [{"type": "scenario", "pass": scenario.get("passed", False)}]
+            for assertion in assertions:
+                writer.writerow(
+                    {
+                        "scenario_id": scenario.get("id", ""),
+                        "category": scenario.get("category", ""),
+                        "passed": scenario.get("passed", False),
+                        "assertion_type": assertion.get("type", ""),
+                        "assertion_pass": assertion.get("pass", False),
+                    }
+                )
 
 
 def _weak_cases(result: dict[str, Any]) -> list[tuple[dict[str, Any], str]]:

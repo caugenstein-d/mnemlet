@@ -150,3 +150,38 @@ def test_benchmark_full_retrieval_only_skips_live_checks_even_when_requested(tmp
     report = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
     assert report["live_results"] == []
     assert not marker.exists()
+
+
+def test_benchmark_quality_writes_reports(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mnemlet",
+            "benchmark",
+            "quality",
+            "--dataset",
+            "public",
+            "--output",
+            str(tmp_path),
+            "--format",
+            "json,md,csv",
+        ],
+        cwd=Path.cwd(),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "results.json").exists()
+    assert (tmp_path / "results.csv").exists()
+    report = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    csv_text = (tmp_path / "results.csv").read_text(encoding="utf-8")
+    assert report["mode"] == "quality"
+    assert "empty_correct_rate" in report["summary"]
+    assert "scenario_id,category,passed" in csv_text

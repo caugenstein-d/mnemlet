@@ -19,7 +19,7 @@ def main():
     benchmark_parser = subparsers.add_parser("benchmark", help="Run Mnemlet benchmarks")
     benchmark_subparsers = benchmark_parser.add_subparsers(dest="benchmark_mode", help="Benchmark modes")
     benchmark_mode_parsers = {}
-    for mode in ("quick", "full"):
+    for mode in ("quick", "full", "quality"):
         mode_parser = benchmark_subparsers.add_parser(mode, help=f"Run {mode} benchmark")
         benchmark_mode_parsers[mode] = mode_parser
         mode_parser.add_argument("--dataset", default="public", help="Benchmark dataset")
@@ -55,19 +55,28 @@ def main():
             benchmark_parser.print_help()
             sys.exit(1)
 
-        from mnemlet.benchmark.datasets import load_dataset
         from mnemlet.benchmark.reports import environment_info, new_run_id, write_reports
-        from mnemlet.benchmark.runner import run_retrieval_benchmark
 
         formats = _parse_benchmark_formats(args.format, benchmark_mode_parsers[args.benchmark_mode])
         output_dir = Path(args.output)
-        dataset = load_dataset(args.dataset, root=Path.cwd())
-        result = run_retrieval_benchmark(
-            dataset,
-            output_dir=output_dir,
-            limit=args.limit,
-            min_score=args.min_score,
-        )
+
+        if args.benchmark_mode == "quality":
+            from mnemlet.benchmark.datasets import load_quality_dataset
+            from mnemlet.benchmark.quality import run_quality_benchmark
+
+            dataset = load_quality_dataset(args.dataset, root=Path.cwd())
+            result = run_quality_benchmark(dataset, output_dir=output_dir)
+        else:
+            from mnemlet.benchmark.datasets import load_dataset
+            from mnemlet.benchmark.runner import run_retrieval_benchmark
+
+            dataset = load_dataset(args.dataset, root=Path.cwd())
+            result = run_retrieval_benchmark(
+                dataset,
+                output_dir=output_dir,
+                limit=args.limit,
+                min_score=args.min_score,
+            )
         result["run_id"] = new_run_id()
         result["mode"] = args.benchmark_mode
         result["command"] = " ".join(["mnemlet", *sys.argv[1:]])
@@ -93,7 +102,10 @@ def main():
 
         paths = write_reports(result, output_dir, formats=formats)
 
-        print(f"Benchmark complete: {result['query_count']} queries")
+        if args.benchmark_mode == "quality":
+            print(f"Benchmark complete: {result['scenario_count']} scenarios")
+        else:
+            print(f"Benchmark complete: {result['query_count']} queries")
         for report_format, path in paths.items():
             print(f"{report_format}: {path}")
     else:
