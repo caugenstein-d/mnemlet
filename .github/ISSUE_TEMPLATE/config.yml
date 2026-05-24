@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/christoph/mnemlet/blob/master/SECURITY.md
+    about: Please follow SECURITY.md for vulnerabilities — do not file a public issue.

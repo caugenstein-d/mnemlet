@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a feature or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the use case, not the proposed implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What did you have in mind?
+      description: Optional. A sketch of how this might work.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Honest scope check
+      options:
+        - label: I have read the ROADMAP.md and this is not already planned.
+        - label: This fits the "solo, local-first, brain-inspired" project values.
