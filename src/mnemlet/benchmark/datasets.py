@@ -259,3 +259,79 @@ def _string_list(value: Any, context: str) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         raise BenchmarkDatasetError(f"{context} must be a list[str]")
     return value
+
+
+@dataclass(frozen=True)
+class QualityPhase:
+    step: int
+    action: str
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class QualityScenario:
+    id: str
+    category: str
+    description: str
+    phases: list[QualityPhase]
+
+
+@dataclass(frozen=True)
+class QualityDataset:
+    name: str
+    version: int
+    scenarios: list[QualityScenario]
+
+
+def resolve_quality_dataset_path(dataset: str, root: Path | None = None) -> Path:
+    base = root or Path.cwd()
+    if dataset == "public":
+        return base / "benchmarks/public/synthetic_quality_scenarios.json"
+    if dataset == "private":
+        return base / "benchmarks/private/real_quality_scenarios.json"
+    path = Path(dataset)
+    if path.is_absolute():
+        return path
+    return base / path
+
+
+def load_quality_dataset(dataset: str, root: Path | None = None) -> QualityDataset:
+    return load_quality_dataset_file(resolve_quality_dataset_path(dataset, root=root))
+
+
+def load_quality_dataset_file(path: Path) -> QualityDataset:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise BenchmarkDatasetError("quality dataset root must be an object")
+    name = _required_string(payload, "name", "quality dataset")
+    version = payload.get("version")
+    if version != 1:
+        raise BenchmarkDatasetError("quality dataset version must be 1")
+    raw_scenarios = payload.get("scenarios")
+    if not isinstance(raw_scenarios, list) or not raw_scenarios:
+        raise BenchmarkDatasetError("quality dataset scenarios must be a non-empty list")
+    scenarios = [_parse_quality_scenario(raw) for raw in raw_scenarios]
+    return QualityDataset(name=name, version=version, scenarios=scenarios)
+
+
+def _parse_quality_scenario(payload: Any) -> QualityScenario:
+    if not isinstance(payload, dict):
+        raise BenchmarkDatasetError("quality scenario must be an object")
+    scenario_id = _required_string(payload, "id", "quality scenario")
+    category = _required_string(payload, "category", f"quality scenario {scenario_id}")
+    description = _required_string(payload, "description", f"quality scenario {scenario_id}")
+    raw_phases = payload.get("phases")
+    if not isinstance(raw_phases, list) or not raw_phases:
+        raise BenchmarkDatasetError(f"quality scenario {scenario_id} phases must be a non-empty list")
+    phases = [_parse_quality_phase(raw) for raw in raw_phases]
+    return QualityScenario(scenario_id, category, description, phases)
+
+
+def _parse_quality_phase(payload: Any) -> QualityPhase:
+    if not isinstance(payload, dict):
+        raise BenchmarkDatasetError("quality phase must be an object")
+    step = payload.get("step")
+    if isinstance(step, bool) or not isinstance(step, int) or step < 1:
+        raise BenchmarkDatasetError("quality phase step must be a positive int")
+    action = _required_string(payload, "action", "quality phase")
+    return QualityPhase(step=step, action=action, payload={key: value for key, value in payload.items() if key not in {"step", "action"}})
