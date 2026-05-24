@@ -115,19 +115,25 @@ class QualityRunner:
             self.logical_ids[payload["new_id"]] = str(result["new_id"])
             return []
         if action == "confirm":
-            real_id = self.logical_ids[payload["memory_id"]]
-            before = self.db.get_memory(real_id)["retention_score"]
+            real_id, memory, missing = self._memory_or_missing_assertion(payload["memory_id"], "confirm")
+            if memory is None:
+                return missing
+            before = memory["retention_score"]
             self.scores_before_confirm[payload["memory_id"]] = before
             self.review_service.confirm(real_id)
             return []
         if action == "assert_score_increased":
-            real_id = self.logical_ids[payload["memory_id"]]
-            current = self.db.get_memory(real_id)["retention_score"]
+            _real_id, memory, missing = self._memory_or_missing_assertion(payload["memory_id"], "assert_score_increased")
+            if memory is None:
+                return missing
+            current = memory["retention_score"]
             before = self.scores_before_confirm[payload["memory_id"]]
             return [{"type": "score_increased", "pass": current > before}]
         if action == "assert_status":
-            real_id = self.logical_ids[payload["memory_id"]]
-            status = self.db.get_memory(real_id)["status"]
+            _real_id, memory, missing = self._memory_or_missing_assertion(payload["memory_id"], "assert_status")
+            if memory is None:
+                return missing
+            status = memory["status"]
             return [{"type": "status", "pass": status == payload["status"], "actual": status, "expected": payload["status"]}]
         if action == "context":
             recalled = self.recall_engine.recall(payload["query"], namespace=payload.get("namespace"), min_score=float(payload.get("min_score", 0.0)))
@@ -158,6 +164,23 @@ class QualityRunner:
             self.logical_ids[memory["id"]] = str(result["memory_id"])
             return []
         raise ValueError(f"unsupported quality action: {action}")
+
+    def _memory_or_missing_assertion(self, logical_id: str, assertion_type: str) -> tuple[str, dict[str, Any] | None, list[dict[str, Any]]]:
+        if self.db is None:
+            raise RuntimeError("quality runner is not set up")
+        real_id = self.logical_ids[logical_id]
+        memory = self.db.get_memory(real_id)
+        if memory is None:
+            return real_id, None, [
+                {
+                    "type": "missing_memory",
+                    "assertion": assertion_type,
+                    "pass": False,
+                    "memory_id": logical_id,
+                    "real_id": real_id,
+                }
+            ]
+        return real_id, memory, []
 
     def _assert_context(self, pack: dict[str, Any], assertions: dict[str, Any]) -> list[dict[str, Any]]:
         items = pack["context_pack"]["primary"] + pack["context_pack"]["supporting"]
@@ -192,7 +215,7 @@ class QualityRunner:
             "scenario_pass_rate": _rate([scenario["passed"] for scenario in scenarios]),
             "assertion_pass_rate": _rate([assertion.get("pass") is True for assertion in assertions]),
             "empty_correct_rate": _rate([assertion.get("pass") is True for assertion in no_hit_assertions]),
-            "false_positive_rate": 1.0 - _rate([assertion.get("pass") is True for assertion in no_hit_assertions]),
+            "false_positive_rate": (1.0 - _rate([assertion.get("pass") is True for assertion in no_hit_assertions])) if no_hit_assertions else 0.0,
             "replace_supersession_rate": _rate([assertion.get("pass") is True for assertion in status_assertions]),
             "provenance_completeness": _rate([assertion.get("pass") is True for assertion in provenance_assertions]),
         }
