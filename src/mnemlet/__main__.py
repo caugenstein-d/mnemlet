@@ -22,15 +22,11 @@ def main():
     for mode in ("quick", "full", "quality"):
         mode_parser = benchmark_subparsers.add_parser(mode, help=f"Run {mode} benchmark")
         benchmark_mode_parsers[mode] = mode_parser
-        mode_parser.add_argument("--dataset", default="public", help="Benchmark dataset")
-        mode_parser.add_argument("--output", default="benchmark-results/latest", help="Output directory")
-        mode_parser.add_argument("--format", default="json,md,csv", help="Comma-separated report formats")
-        mode_parser.add_argument("--min-score", type=float, default=0.1, help="Minimum recall score")
-        mode_parser.add_argument("--limit", type=int, default=5, help="Recall result limit")
-        mode_parser.add_argument("--include-adapters", action="store_true", help="Run safe adapter-level checks")
-        mode_parser.add_argument("--include-live-opencode", action="store_true", help="Run opt-in live OpenCode checks in full mode")
-        mode_parser.add_argument("--include-live-openwebui", action="store_true", help="Run opt-in live OpenWebUI checks in full mode")
-        mode_parser.add_argument("--retrieval-only", action="store_true", help="Run only retrieval checks")
+        _add_benchmark_common_args(mode_parser)
+        if mode in {"quick", "full"}:
+            _add_retrieval_benchmark_args(mode_parser)
+        if mode == "full":
+            _add_live_benchmark_args(mode_parser)
 
     args = parser.parse_args()
 
@@ -82,7 +78,7 @@ def main():
         result["command"] = " ".join(["mnemlet", *sys.argv[1:]])
         result["environment"] = environment_info()
 
-        if args.include_adapters and not args.retrieval_only:
+        if args.benchmark_mode != "quality" and args.include_adapters and not args.retrieval_only:
             from mnemlet.benchmark.adapters import run_adapter_checks, summarize_adapter_results
 
             adapter_results = run_adapter_checks()
@@ -111,6 +107,24 @@ def main():
     else:
         parser.print_help()
         sys.exit(1)
+
+
+def _add_benchmark_common_args(mode_parser: argparse.ArgumentParser) -> None:
+    mode_parser.add_argument("--dataset", default="public", help="Benchmark dataset")
+    mode_parser.add_argument("--output", default="benchmark-results/latest", help="Output directory")
+    mode_parser.add_argument("--format", default="json,md,csv", help="Comma-separated report formats")
+
+
+def _add_retrieval_benchmark_args(mode_parser: argparse.ArgumentParser) -> None:
+    mode_parser.add_argument("--min-score", type=float, default=0.1, help="Minimum recall score")
+    mode_parser.add_argument("--limit", type=int, default=5, help="Recall result limit")
+    mode_parser.add_argument("--include-adapters", action="store_true", help="Run safe adapter-level checks")
+    mode_parser.add_argument("--retrieval-only", action="store_true", help="Run only retrieval checks")
+
+
+def _add_live_benchmark_args(mode_parser: argparse.ArgumentParser) -> None:
+    mode_parser.add_argument("--include-live-opencode", action="store_true", help="Run opt-in live OpenCode checks in full mode")
+    mode_parser.add_argument("--include-live-openwebui", action="store_true", help="Run opt-in live OpenWebUI checks in full mode")
 
 
 def _parse_benchmark_formats(value: str, parser: argparse.ArgumentParser) -> tuple[str, ...]:

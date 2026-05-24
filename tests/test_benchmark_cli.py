@@ -9,6 +9,19 @@ import sys
 from pathlib import Path
 
 
+def _run_benchmark_cli(args: list[str], output_dir: Path) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+    return subprocess.run(
+        [sys.executable, "-m", "mnemlet", "benchmark", *args, "--output", str(output_dir), "--format", "json"],
+        cwd=Path.cwd(),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
 def test_benchmark_quick_writes_requested_reports(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PYTHONPATH"] = "src"
@@ -185,3 +198,40 @@ def test_benchmark_quality_writes_reports(tmp_path: Path) -> None:
     assert report["mode"] == "quality"
     assert "empty_correct_rate" in report["summary"]
     assert "scenario_id,category,passed" in csv_text
+
+
+def test_benchmark_quality_rejects_retrieval_only(tmp_path: Path) -> None:
+    result = _run_benchmark_cli(["quality", "--dataset", "public", "--retrieval-only"], tmp_path)
+
+    assert result.returncode != 0
+    assert "unrecognized arguments" in result.stderr
+    assert "--retrieval-only" in result.stderr
+    assert not (tmp_path / "results.json").exists()
+
+
+def test_benchmark_quality_rejects_limit_and_min_score(tmp_path: Path) -> None:
+    result = _run_benchmark_cli(["quality", "--dataset", "public", "--limit", "2", "--min-score", "0.2"], tmp_path)
+
+    assert result.returncode != 0
+    assert "unrecognized arguments" in result.stderr
+    assert "--limit" in result.stderr
+    assert "--min-score" in result.stderr
+    assert not (tmp_path / "results.json").exists()
+
+
+def test_benchmark_quality_rejects_include_adapters(tmp_path: Path) -> None:
+    result = _run_benchmark_cli(["quality", "--dataset", "public", "--include-adapters"], tmp_path)
+
+    assert result.returncode != 0
+    assert "unrecognized arguments" in result.stderr
+    assert "--include-adapters" in result.stderr
+    assert not (tmp_path / "results.json").exists()
+
+
+def test_benchmark_quality_rejects_live_flags(tmp_path: Path) -> None:
+    result = _run_benchmark_cli(["quality", "--dataset", "public", "--include-live-openwebui"], tmp_path)
+
+    assert result.returncode != 0
+    assert "unrecognized arguments" in result.stderr
+    assert "--include-live-openwebui" in result.stderr
+    assert not (tmp_path / "results.json").exists()
