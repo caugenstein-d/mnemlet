@@ -3,6 +3,8 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
+from mnemlet import __version__
+
 
 router = APIRouter(prefix="/api/v1", tags=["status"])
 
@@ -35,7 +37,7 @@ async def status(request: Request):
         "cold_storage_memories": cold,
         "total_interactions": interactions,
         "chroma_documents": chroma_count,
-        "version": "0.1.0",
+        "version": __version__,
     }
 
 

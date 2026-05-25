@@ -1,7 +1,9 @@
-"""MCP (Model Context Protocol) server for Mnemlet — 8 tools."""
+"""MCP (Model Context Protocol) server for Mnemlet — 14 tools."""
 
 import json
 from mcp.server.fastmcp import FastMCP
+
+from mnemlet import __version__
 
 
 def create_mcp_server(app_state) -> FastMCP:
@@ -140,7 +142,7 @@ def create_mcp_server(app_state) -> FastMCP:
             "cold_storage_memories": cold,
             "total_interactions": interactions,
             "chroma_documents": chroma.count(),
-            "version": "0.1.0",
+            "version": __version__,
         }
 
     @mcp.tool()

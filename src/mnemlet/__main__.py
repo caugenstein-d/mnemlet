@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from mnemlet import __version__
 from mnemlet.config import MnemletConfig
 
 
@@ -43,7 +44,7 @@ def main():
         import uvicorn
 
         app = create_app(config)
-        print(f"Mnemlet v0.1.0")
+        print(f"Mnemlet v{__version__}")
         print(f"Starting server at http://{host}:{port}")
         uvicorn.run(app, host=host, port=port, log_level="info")
     elif args.command == "benchmark":

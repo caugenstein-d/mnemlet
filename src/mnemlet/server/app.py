@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from mnemlet import __version__
 from mnemlet.config import MnemletConfig
 from mnemlet.storage.sqlite import MnemletDB
 from mnemlet.storage.chroma import MnemletChroma
@@ -108,7 +109,7 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
     app = FastAPI(
         title="Mnemlet",
         description="Self-hosted, brain-inspired memory engine for AI agents.",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
     )
     app.state.config = config
