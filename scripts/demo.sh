@@ -12,7 +12,13 @@ YELLOW="\033[33m"
 DIM="\033[2m"
 RESET="\033[0m"
 
-PORT="${MNEMLET_DEMO_PORT:-14060}"
+if [[ -n "${MNEMLET_DEMO_PORT:-}" ]]; then
+  PORT="${MNEMLET_DEMO_PORT}"
+elif (exec 3<>/dev/tcp/127.0.0.1/14060) >/dev/null 2>&1; then
+  PORT="14061"
+else
+  PORT="14060"
+fi
 BASE="http://127.0.0.1:${PORT}"
 DATA_DIR="$(mktemp -d -t mnemlet-demo.XXXXXX)"
 SERVER_LOG="${DATA_DIR}/server.log"
