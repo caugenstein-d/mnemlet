@@ -1,105 +1,121 @@
 #!/usr/bin/env bash
-# Mnémlet Demo — terminal cast for launch
-# Shows: start → ingest → recall → sleep → vault → briefing
+# Mnémlet Demo — v0.2 terminal cast for launch surface
+# Shows: remember → sleep briefing → context pack → explain → vault
 # Run: bash scripts/demo.sh
 
-set -e
+set -euo pipefail
 
 BOLD="\033[1m"
 GREEN="\033[32m"
 BLUE="\033[34m"
 YELLOW="\033[33m"
+DIM="\033[2m"
 RESET="\033[0m"
 
-echo -e "${BOLD}🧠 Mnémlet v0.1.0 — Self-Hosted Memory Engine${RESET}"
-echo -e "${BLUE}Running on: Raspberry Pi 5 (16GB, ARM64)${RESET}"
+PORT="${MNEMLET_DEMO_PORT:-14060}"
+BASE="http://127.0.0.1:${PORT}"
+DATA_DIR="$(mktemp -d -t mnemlet-demo.XXXXXX)"
+SERVER_LOG="${DATA_DIR}/server.log"
+PID=""
+
+cleanup() {
+  if [[ -n "${PID}" ]]; then
+    kill "${PID}" >/dev/null 2>&1 || true
+    wait "${PID}" >/dev/null 2>&1 || true
+  fi
+  rm -rf "${DATA_DIR}"
+}
+trap cleanup EXIT
+
+json_get() {
+  .venv/bin/python -c "import json,sys; print(json.load(sys.stdin)$1)"
+}
+
+pretty_json() {
+  .venv/bin/python -m json.tool
+}
+
+echo -e "${BOLD}Mnémlet v0.2.0 — Memory that forgets, sleeps, and explains itself${RESET}"
+echo -e "${BLUE}Throwaway demo vault: ${DATA_DIR}${RESET}"
 echo ""
 
-# Start Mnémlet
-echo -e "${YELLOW}▶ Starting Mnémlet...${RESET}"
-/home/christoph/mnemlet/.venv/bin/mnemlet serve --port 14060 &
+echo -e "${YELLOW}▶ Starting isolated Mnémlet demo server...${RESET}"
+MNEMLET_DATA_DIR="${DATA_DIR}" .venv/bin/mnemlet serve --host 127.0.0.1 --port "${PORT}" >"${SERVER_LOG}" 2>&1 &
 PID=$!
-sleep 5
 
-# Wait for server to be ready
-for i in $(seq 1 10); do
-  if curl -s http://localhost:14060/api/v1/health > /dev/null 2>&1; then
+for _ in $(seq 1 30); do
+  if curl -fsS "${BASE}/api/v1/health" >/dev/null 2>&1; then
     break
   fi
-  sleep 2
+  sleep 1
 done
 
-echo -e "${GREEN}✓ Server running at http://127.0.0.1:14060${RESET}"
+curl -fsS "${BASE}/api/v1/health" >/dev/null
+echo -e "${GREEN}✓ Demo server running at ${BASE}${RESET}"
 echo ""
 
-# Ingest memories
-echo -e "${YELLOW}▶ Ingesting memories...${RESET}"
-echo -e "${BOLD}$ curl -X POST /api/v1/ingest -d '{\"content\":\"Christoph prefers dark mode in all editors\",\"namespace\":\"preferences\",\"importance\":0.9}'${RESET}"
-curl -s -X POST http://localhost:14060/api/v1/ingest -H 'Content-Type: application/json' -d '{"content":"Christoph prefers dark mode in all editors","namespace":"preferences","importance":0.9}' | python3 -m json.tool
+echo -e "${YELLOW}▶ Remembering three v0.2 memories...${RESET}"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -d '{... preference ...}'${RESET}"
+PREF_JSON="$(curl -fsS -X POST "${BASE}/api/v1/remember" \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Christoph prefers dark mode in all editors","namespace":"preferences","importance":0.9,"memory_type":"preference"}')"
+printf '%s\n' "${PREF_JSON}" | pretty_json
+PREF_ID="$(printf '%s\n' "${PREF_JSON}" | json_get '["memory_id"]')"
 echo ""
 
-echo -e "${BOLD}$ curl -X POST /api/v1/ingest -d '{\"content\":\"Christoph asked about today\\'s weather in Berlin\",\"namespace\":\"daily_chat\",\"importance\":0.2}'${RESET}"
-curl -s -X POST http://localhost:14060/api/v1/ingest -H 'Content-Type: application/json' -d '{"content":"Christoph asked about today'\''s weather in Berlin","namespace":"daily_chat","importance":0.2}' | python3 -m json.tool
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -d '{... project fact ...}'${RESET}"
+curl -fsS -X POST "${BASE}/api/v1/remember" \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Mnémlet v0.2 adds context packs, provenance, and review commands","namespace":"projects/mnemlet","importance":0.85,"memory_type":"fact"}' | pretty_json
 echo ""
 
-echo -e "${BOLD}$ curl -X POST /api/v1/ingest -d '{\"content\":\"MiroFish is the main active project\",\"namespace\":\"projects/mirofish\",\"importance\":0.8}'${RESET}"
-curl -s -X POST http://localhost:14060/api/v1/ingest -H 'Content-Type: application/json' -d '{"content":"MiroFish is the main active project","namespace":"projects/mirofish","importance":0.8}' | python3 -m json.tool
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -d '{... transient event ...}'${RESET}"
+curl -fsS -X POST "${BASE}/api/v1/remember" \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Today Christoph is polishing the public v0.2 launch surface","namespace":"daily_chat","importance":0.35,"memory_type":"event"}' | pretty_json
 echo ""
 
-# Show status
-echo -e "${YELLOW}▶ Memory status:${RESET}"
-echo -e "${BOLD}$ curl /api/v1/status${RESET}"
-curl -s http://localhost:14060/api/v1/status | python3 -m json.tool
+echo -e "${YELLOW}▶ Running Sleep Engine...${RESET}"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/sleep/start${RESET}"
+curl -fsS -X POST "${BASE}/api/v1/sleep/start" | pretty_json
+
+for _ in $(seq 1 150); do
+  STATUS_JSON="$(curl -fsS "${BASE}/api/v1/sleep/status")"
+  STATE="$(printf '%s\n' "${STATUS_JSON}" | json_get '["state"]')"
+  BRIEFING_READY="$(printf '%s\n' "${STATUS_JSON}" | json_get '["checkpoint"].get("_task_prepare_briefing")')"
+  if [[ "${STATE}" == "completed" || "${BRIEFING_READY}" == "True" ]]; then
+    break
+  fi
+  sleep 1
+done
+
+echo -e "${BOLD}$ curl ${BASE}/api/v1/sleep/status${RESET}"
+curl -fsS "${BASE}/api/v1/sleep/status" | pretty_json
 echo ""
 
-# Recall
-echo -e "${YELLOW}▶ Recalling: 'editor theme preference'${RESET}"
-echo -e "${BOLD}$ curl /api/v1/recall -d '{\"query\":\"editor theme preference\"}'${RESET}"
-curl -s -X POST http://localhost:14060/api/v1/recall -H 'Content-Type: application/json' -d '{"query":"editor theme preference","limit":3}' | python3 -m json.tool
+echo -e "${YELLOW}▶ Morning briefing written to the Markdown vault:${RESET}"
+BRIEFING_FILE="$(find "${DATA_DIR}/vault/__system__/morning_briefing" -name 'briefing-*.md' | sort | tail -1)"
+echo -e "${BOLD}$ sed -n '1,18p' ${BRIEFING_FILE#${DATA_DIR}/}${RESET}"
+sed -n '1,18p' "${BRIEFING_FILE}"
 echo ""
 
-# Configure decay
-echo -e "${YELLOW}▶ Set decay rates per namespace:${RESET}"
-echo -e "${BOLD}$ curl PUT /api/v1/namespaces/preferences/decay -d '{\"lambda\":0.001}'  ← preferences: ~2yr half-life${RESET}"
-curl -s -X PUT http://localhost:14060/api/v1/namespaces/preferences/decay -H 'Content-Type: application/json' -d '{"lambda":0.001}' | python3 -m json.tool
+echo -e "${YELLOW}▶ Context Pack with abstention/provenance metadata:${RESET}"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/context -d '{"query":"editor theme preference"}'${RESET}"
+curl -fsS -X POST "${BASE}/api/v1/context" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"editor theme preference","namespace":"preferences","limit":3,"min_score":0.1}' | pretty_json
 echo ""
 
-echo -e "${BOLD}$ curl PUT /api/v1/namespaces/daily_chat/decay -d '{\"lambda\":0.5}'    ← daily chat: ~1.4day half-life${RESET}"
-curl -s -X PUT http://localhost:14060/api/v1/namespaces/daily_chat/decay -H 'Content-Type: application/json' -d '{"lambda":0.5}' | python3 -m json.tool
+echo -e "${YELLOW}▶ Explain why Mnémlet knows this:${RESET}"
+echo -e "${BOLD}$ curl ${BASE}/api/v1/explain/${PREF_ID}${RESET}"
+curl -fsS "${BASE}/api/v1/explain/${PREF_ID}" | pretty_json
 echo ""
 
-# Trigger sleep
-echo -e "${YELLOW}▶ Triggering Sleep Engine (night consolidation)...${RESET}"
-echo -e "${BOLD}$ curl POST /api/v1/sleep/start${RESET}"
-curl -s -X POST http://localhost:14060/api/v1/sleep/start | python3 -m json.tool
-sleep 8
-curl -s http://localhost:14060/api/v1/sleep/status | python3 -m json.tool
+echo -e "${YELLOW}▶ Inspectable vault file:${RESET}"
+VAULT_FILE="$(find "${DATA_DIR}/vault/preferences" -name "${PREF_ID}.md" | sort | tail -1)"
+echo -e "${BOLD}$ sed -n '1,16p' ${VAULT_FILE#${DATA_DIR}/}${RESET}"
+sed -n '1,16p' "${VAULT_FILE}"
 echo ""
 
-# Show vault
-echo -e "${YELLOW}▶ Inspectable Markdown Vault:${RESET}"
-echo -e "${BOLD}$ ls ~/.mnemlet/vault/preferences/*/${RESET}"
-ls ~/.mnemlet/vault/preferences/*/ 2>/dev/null
-echo ""
-echo -e "${BOLD}$ cat ~/.mnemlet/vault/preferences/*/$(ls ~/.mnemlet/vault/preferences/*/ 2>/dev/null | head -1)${RESET}"
-cat ~/.mnemlet/vault/preferences/*/$(ls ~/.mnemlet/vault/preferences/*/ 2>/dev/null | head -1) 2>/dev/null
-echo ""
-
-# Show API
-echo -e "${YELLOW}▶ API Reference:${RESET}"
-echo -e "  GET  /api/v1/health        — Health check"
-echo -e "  GET  /api/v1/status        — Memory counts"
-echo -e "  POST /api/v1/ingest        — Store memory"
-echo -e "  POST /api/v1/recall        — Retrieve memories"
-echo -e "  POST /api/v1/decay/run     — Manual decay"
-echo -e "  GET  /api/v1/namespaces/{ns}/decay — Config"
-echo -e "  GET  /api/v1/vault         — Vault path"
-echo -e "  GET  /api/v1/sleep/status  — Sleep state"
-echo -e "  POST /api/v1/sleep/start   — Start sleep"
-echo -e "  /mcp                        — MCP server (8 tools)"
-echo ""
-
-echo -e "${GREEN}${BOLD}🧠 Mnémlet runs on this Pi. Your agents wake up smarter.${RESET}"
-echo -e "${BLUE}github.com/christoph/mnemlet${RESET}"
-
-kill $PID 2>/dev/null || true
+echo -e "${GREEN}${BOLD}Mnémlet runs locally. Your agents wake up with memory they can inspect.${RESET}"
+echo -e "${DIM}github.com/christoph/mnemlet${RESET}"
