@@ -16,6 +16,10 @@ Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](htt
 [![Demo](https://img.shields.io/badge/demo-asciinema-ff69b4)](scripts/demo.cast)
 [![Website](https://img.shields.io/badge/web-mnemlet.dev-22C55E)](https://christoph.github.io/mnemlet)
 
+<p align="center">
+  <img src="docs/assets/mnemlet-vault-preview.svg" alt="Mnémlet Markdown vault preview showing frontmatter, namespace, retention score, and memory content" width="840">
+</p>
+
 ---
 
 ## What Mnémlet Does
@@ -30,7 +34,7 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 - 🔍 **Hybrid search** — BM25 (SQLite FTS5) + vector similarity (ChromaDB). Both local, both free.
 - 🥧 **Pi-ready** — 450 MB RAM baseline, ~4 GB with LLM. Runs on a Raspberry Pi 5 (16 GB recommended for the full stack).
 - 💰 **Zero API costs** — Local ONNX embeddings (all-MiniLM-L6-v2). No OpenAI key, no cloud embedding service, no per-call charges. SearXNG optionally self-hosted for web enrichment.
-- 🐍 **Python SDK, REST API, CLI** — `pip install mnemlet` then `mnemlet serve`.
+- 🐍 **Python SDK, REST API, CLI** — install v0.2.0 from the GitHub tag for now, then `mnemlet serve`. PyPI follows after the v0.3 Trust/Security layer.
 
 ---
 
