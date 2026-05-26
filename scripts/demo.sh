@@ -12,14 +12,6 @@ YELLOW="\033[33m"
 DIM="\033[2m"
 RESET="\033[0m"
 
-if [[ -n "${MNEMLET_DEMO_PORT:-}" ]]; then
-  PORT="${MNEMLET_DEMO_PORT}"
-elif (exec 3<>/dev/tcp/127.0.0.1/14060) >/dev/null 2>&1; then
-  PORT="14061"
-else
-  PORT="14060"
-fi
-BASE="http://127.0.0.1:${PORT}"
 DATA_DIR="$(mktemp -d -t mnemlet-demo.XXXXXX)"
 SERVER_LOG="${DATA_DIR}/server.log"
 PID=""
@@ -41,6 +33,36 @@ pretty_json() {
   .venv/bin/python -m json.tool
 }
 
+port_is_free() {
+  .venv/bin/python - "$1" <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+try:
+    with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+        raise SystemExit(1)
+except OSError:
+    raise SystemExit(0)
+PY
+}
+
+if [[ -n "${MNEMLET_DEMO_PORT:-}" ]]; then
+  PORT="${MNEMLET_DEMO_PORT}"
+  if ! port_is_free "${PORT}"; then
+    echo "MNEMLET_DEMO_PORT is already in use: ${PORT}" >&2
+    exit 1
+  fi
+elif port_is_free 14060; then
+  PORT="14060"
+elif port_is_free 14061; then
+  PORT="14061"
+else
+  echo "Neither demo port 14060 nor 14061 is free" >&2
+  exit 1
+fi
+BASE="http://127.0.0.1:${PORT}"
+
 echo -e "${BOLD}Mnémlet v0.2.0 — Memory that forgets, sleeps, and explains itself${RESET}"
 echo -e "${BLUE}Throwaway demo vault: ${DATA_DIR}${RESET}"
 echo ""
@@ -50,6 +72,11 @@ MNEMLET_DATA_DIR="${DATA_DIR}" .venv/bin/mnemlet serve --host 127.0.0.1 --port "
 PID=$!
 
 for _ in $(seq 1 30); do
+  if ! kill -0 "${PID}" >/dev/null 2>&1; then
+    echo "Demo server exited before becoming healthy" >&2
+    sed -n '1,120p' "${SERVER_LOG}" >&2 || true
+    exit 1
+  fi
   if curl -fsS "${BASE}/api/v1/health" >/dev/null 2>&1; then
     break
   fi
@@ -106,7 +133,7 @@ sed -n '1,18p' "${BRIEFING_FILE}"
 echo ""
 
 echo -e "${YELLOW}▶ Context Pack with abstention/provenance metadata:${RESET}"
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/context -d '{"query":"editor theme preference"}'${RESET}"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/context -d '{\"query\":\"editor theme preference\"}'${RESET}"
 curl -fsS -X POST "${BASE}/api/v1/context" \
   -H 'Content-Type: application/json' \
   -d '{"query":"editor theme preference","namespace":"preferences","limit":3,"min_score":0.1}' | pretty_json
