@@ -12,7 +12,7 @@ integration, Quality Hardening. Full notes in
 
 ## Next — v0.3 (Trust / Security / Privacy)
 
-Spec: [`trust-security-privacy-layer-design.md`](docs/superpowers/specs/2026-05-22-trust-security-privacy-layer-design.md).
+Spec: [`v0.3 publication-grade Trust / Security / Privacy design`](docs/superpowers/specs/2026-05-26-v0.3-publication-trust-security-privacy-design.md).
 
 The v0.3 **P0 ("Muss haben")** set from the spec, in priority order:
 
