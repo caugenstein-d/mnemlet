@@ -236,7 +236,8 @@ def test_cli_backup_prints_archive_under_requested_output(tmp_path: Path) -> Non
 
 def test_cli_backup_from_empty_data_dir_includes_restorable_db(tmp_path: Path) -> None:
     output_dir = tmp_path / "backups"
-    env = {**os.environ, "MNEMLET_DATA_DIR": str(tmp_path / "data")}
+    data_dir = tmp_path / "data"
+    env = {**os.environ, "MNEMLET_DATA_DIR": str(data_dir)}
 
     result = subprocess.run(
         [".venv/bin/mnemlet", "backup", "--output", str(output_dir)],
@@ -250,6 +251,7 @@ def test_cli_backup_from_empty_data_dir_includes_restorable_db(tmp_path: Path) -
     backup_path = Path(result.stdout.strip().removeprefix("Backup created: "))
     with tarfile.open(backup_path, "r:gz") as tar:
         assert "mnemlet.db" in tar.getnames()
+    assert not (data_dir / "mnemlet.db").exists()
 
     restore_config = _config(tmp_path / "restore-target")
     restore_backup(restore_config, backup_path, confirm=True)
@@ -291,3 +293,35 @@ def test_restore_rolls_back_directory_when_install_fails(
         restore_backup(target_config, backup_path, confirm=True)
 
     assert keep_file.read_text() == "keep"
+
+
+def test_failed_restore_pre_backup_does_not_create_missing_target_db(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_config = _config(tmp_path / "source")
+    target_config = _config(tmp_path / "target")
+    source_db = MnemletDB(source_config.sqlite_path)
+    source_db.insert_memory(namespace="preferences", content_preview="source")
+    source_db.close()
+    (source_config.vault_path / "preferences").mkdir(parents=True)
+    (source_config.vault_path / "preferences" / "new.md").write_text("new")
+    backup_path = create_backup(source_config, output_dir=tmp_path / "backups")
+    target_config.vault_path.mkdir(parents=True)
+    keep_file = target_config.vault_path / "keep.md"
+    keep_file.write_text("keep")
+    assert not target_config.sqlite_path.exists()
+
+    original_install = restore_module._install_staged_path
+
+    def fail_install(staged: Path, destination: Path) -> None:
+        if destination == target_config.vault_path:
+            raise OSError("simulated install failure")
+        original_install(staged, destination)
+
+    monkeypatch.setattr(restore_module, "_install_staged_path", fail_install)
+
+    with pytest.raises(OSError, match="simulated install failure"):
+        restore_backup(target_config, backup_path, confirm=True)
+
+    assert keep_file.read_text() == "keep"
+    assert not target_config.sqlite_path.exists()
