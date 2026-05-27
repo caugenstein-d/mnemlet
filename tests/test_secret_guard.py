@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import tempfile
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from mcp.server.fastmcp.exceptions import ToolError
 
 from mnemlet.config import MnemletConfig
 from mnemlet.security.secret_guard import SecretGuard, SecretGuardAction, SecretGuardResult
 from mnemlet.server.app import create_app
+from mnemlet.server.mcp_server import create_mcp_server
 
 
 def test_secret_guard_detects_github_pat() -> None:
@@ -72,3 +75,34 @@ async def test_ingest_blocks_secret_by_default() -> None:
     assert "openai_key" in str(response.json())
     assert key not in str(response.json())
     assert any(event["result"] == "blocked" for event in audit.json()["events"])
+
+
+@pytest.mark.asyncio
+async def test_mcp_update_blocks_secret_content_without_storing_key_material() -> None:
+    key = "sk-" + "a" * 48
+    async with _client() as client:
+        app_state = client._transport.app.state
+        mcp = create_mcp_server(app_state)
+        result = await mcp.call_tool(
+            "mnemlet_ingest",
+            {"content": "safe initial memory", "namespace": "mcp-update", "importance": 0.4},
+        )
+        memory_id = json.loads(result[0].text)["memory_id"]
+
+        with pytest.raises(ToolError) as exc_info:
+            await mcp.call_tool(
+                "mnemlet_update",
+                {"memory_id": memory_id, "content": f"replacement {key}"},
+            )
+
+        memory = app_state.db.get_memory(memory_id)
+        events = app_state.db.query_audit(namespace="mcp-update", action="update", limit=10)
+
+    assert "openai_key" in str(exc_info.value)
+    assert key not in str(exc_info.value)
+    assert memory is not None
+    assert key not in memory["content_preview"]
+    assert memory["content_preview"] == "safe initial memory"
+    assert any(event["result"] == "blocked" for event in events)
+    assert "openai_key" in str(events)
+    assert key not in str(events)

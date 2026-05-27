@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 from mnemlet import __version__
 from mnemlet.security.audit import AuditEvent, AuditResult
+from mnemlet.security.secret_guard import SecretGuard
 
 
 def create_mcp_server(app_state) -> FastMCP:
@@ -263,6 +264,18 @@ def create_mcp_server(app_state) -> FastMCP:
             return {"error": f"Memory {memory_id} not found"}
 
         if content:
+            guard_result = SecretGuard().enforce(content, "block")
+            if guard_result.blocked:
+                patterns = sorted({finding.pattern_type for finding in guard_result.findings})
+                message = f"secret_guard_blocked: patterns={','.join(patterns)}"
+                record_mcp_audit(
+                    "update",
+                    namespace=memory.get("namespace"),
+                    memory_id=memory_id,
+                    details={"secret_guard_patterns": patterns},
+                    result="blocked",
+                )
+                raise ValueError(message)
             db.conn.execute(
                 "UPDATE memories SET content_preview = ?, "
                 "metadata_json = json_set(metadata_json, '$.updated', 'true') "
