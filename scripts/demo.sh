@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Mnémlet Demo — v0.2 terminal cast for launch surface
-# Shows: remember → sleep briefing → context pack → explain → vault
+# Mnémlet Demo - v0.3 Trust / Security / Privacy release surface
+# Shows: API-key auth -> Secret Guard -> Audit -> Explain Trust
 # Run: bash scripts/demo.sh
 
 set -euo pipefail
@@ -61,94 +61,73 @@ else
   echo "Neither demo port 14060 nor 14061 is free" >&2
   exit 1
 fi
-BASE="http://127.0.0.1:${PORT}"
 
-echo -e "${BOLD}Mnémlet v0.2.0 — Memory that forgets, sleeps, and explains itself${RESET}"
+BASE="http://127.0.0.1:${PORT}"
+export MNEMLET_API_KEY="$(.venv/bin/mnemlet auth generate-key)"
+
+auth_header=(-H "X-Mnemlet-Key: ${MNEMLET_API_KEY}")
+json_header=(-H 'Content-Type: application/json')
+
+echo -e "${BOLD}Mnémlet v0.3 - Trust / Security / Privacy${RESET}"
 echo -e "${BLUE}Throwaway demo vault: ${DATA_DIR}${RESET}"
+echo -e "${DIM}Demo key generated in-process and discarded on exit.${RESET}"
 echo ""
 
-echo -e "${YELLOW}▶ Starting isolated Mnémlet demo server...${RESET}"
-MNEMLET_DATA_DIR="${DATA_DIR}" .venv/bin/mnemlet serve --host 127.0.0.1 --port "${PORT}" >"${SERVER_LOG}" 2>&1 &
+echo -e "${YELLOW}> Starting isolated authenticated Mnémlet demo server...${RESET}"
+MNEMLET_DATA_DIR="${DATA_DIR}" MNEMLET_API_KEY="${MNEMLET_API_KEY}" \
+  .venv/bin/mnemlet serve --host 127.0.0.1 --port "${PORT}" >"${SERVER_LOG}" 2>&1 &
 PID=$!
 
 for _ in $(seq 1 30); do
   if ! kill -0 "${PID}" >/dev/null 2>&1; then
     echo "Demo server exited before becoming healthy" >&2
-    sed -n '1,120p' "${SERVER_LOG}" >&2 || true
+    .venv/bin/python - "${SERVER_LOG}" <<'PY' >&2
+from pathlib import Path
+import sys
+
+print(Path(sys.argv[1]).read_text(errors="replace")[:4000])
+PY
     exit 1
   fi
-  if curl -fsS "${BASE}/api/v1/health" >/dev/null 2>&1; then
+  if curl -fsS "${auth_header[@]}" "${BASE}/api/v1/health" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-curl -fsS "${BASE}/api/v1/health" >/dev/null
-echo -e "${GREEN}✓ Demo server running at ${BASE}${RESET}"
+curl -fsS "${auth_header[@]}" "${BASE}/api/v1/health" >/dev/null
+echo -e "${GREEN}OK Demo server running at ${BASE}${RESET}"
 echo ""
 
-echo -e "${YELLOW}▶ Remembering three v0.2 memories...${RESET}"
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -d '{... preference ...}'${RESET}"
+echo -e "${YELLOW}> Remembering an authenticated preference...${RESET}"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -H 'X-Mnemlet-Key: ...' -d '{... preference ...}'${RESET}"
 PREF_JSON="$(curl -fsS -X POST "${BASE}/api/v1/remember" \
-  -H 'Content-Type: application/json' \
+  "${auth_header[@]}" \
+  "${json_header[@]}" \
   -d '{"content":"Christoph prefers dark mode in all editors","namespace":"preferences","importance":0.9,"memory_type":"preference"}')"
 printf '%s\n' "${PREF_JSON}" | pretty_json
 PREF_ID="$(printf '%s\n' "${PREF_JSON}" | json_get '["memory_id"]')"
 echo ""
 
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -d '{... project fact ...}'${RESET}"
-curl -fsS -X POST "${BASE}/api/v1/remember" \
-  -H 'Content-Type: application/json' \
-  -d '{"content":"Mnémlet v0.2 adds context packs, provenance, and review commands","namespace":"projects/mnemlet","importance":0.85,"memory_type":"fact"}' | pretty_json
+echo -e "${YELLOW}> Secret Guard blocks a fake test key before storage...${RESET}"
+FAKE_KEY="sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/ingest -H 'X-Mnemlet-Key: ...' -d '{... fake key ...}'${RESET}"
+SECRET_RESPONSE="$(curl -sS -X POST "${BASE}/api/v1/ingest" \
+  "${auth_header[@]}" \
+  "${json_header[@]}" \
+  -d "{\"content\":\"temporary test token ${FAKE_KEY}\",\"namespace\":\"security-demo\"}")"
+printf '%s\n' "${SECRET_RESPONSE}" | pretty_json
 echo ""
 
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -d '{... transient event ...}'${RESET}"
-curl -fsS -X POST "${BASE}/api/v1/remember" \
-  -H 'Content-Type: application/json' \
-  -d '{"content":"Today Christoph is polishing the public v0.2 launch surface","namespace":"daily_chat","importance":0.35,"memory_type":"event"}' | pretty_json
+echo -e "${YELLOW}> Audit shows success and blocked security events...${RESET}"
+echo -e "${BOLD}$ curl ${BASE}/api/v1/audit -H 'X-Mnemlet-Key: ...'${RESET}"
+curl -fsS "${auth_header[@]}" "${BASE}/api/v1/audit?limit=8" | pretty_json
 echo ""
 
-echo -e "${YELLOW}▶ Running Sleep Engine...${RESET}"
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/sleep/start${RESET}"
-curl -fsS -X POST "${BASE}/api/v1/sleep/start" | pretty_json
-
-for _ in $(seq 1 150); do
-  STATUS_JSON="$(curl -fsS "${BASE}/api/v1/sleep/status")"
-  STATE="$(printf '%s\n' "${STATUS_JSON}" | json_get '["state"]')"
-  BRIEFING_READY="$(printf '%s\n' "${STATUS_JSON}" | json_get '["checkpoint"].get("_task_prepare_briefing")')"
-  if [[ "${STATE}" == "completed" || "${BRIEFING_READY}" == "True" ]]; then
-    break
-  fi
-  sleep 1
-done
-
-echo -e "${BOLD}$ curl ${BASE}/api/v1/sleep/status${RESET}"
-curl -fsS "${BASE}/api/v1/sleep/status" | pretty_json
+echo -e "${YELLOW}> Explain includes a Trust block for the stored memory...${RESET}"
+echo -e "${BOLD}$ curl ${BASE}/api/v1/explain/${PREF_ID} -H 'X-Mnemlet-Key: ...'${RESET}"
+curl -fsS "${auth_header[@]}" "${BASE}/api/v1/explain/${PREF_ID}" | pretty_json
 echo ""
 
-echo -e "${YELLOW}▶ Morning briefing written to the Markdown vault:${RESET}"
-BRIEFING_FILE="$(find "${DATA_DIR}/vault/__system__/morning_briefing" -name 'briefing-*.md' | sort | tail -1)"
-echo -e "${BOLD}$ sed -n '1,18p' ${BRIEFING_FILE#${DATA_DIR}/}${RESET}"
-sed -n '1,18p' "${BRIEFING_FILE}"
-echo ""
-
-echo -e "${YELLOW}▶ Context Pack with abstention/provenance metadata:${RESET}"
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/context -d '{\"query\":\"editor theme preference\"}'${RESET}"
-curl -fsS -X POST "${BASE}/api/v1/context" \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"editor theme preference","namespace":"preferences","limit":3,"min_score":0.1}' | pretty_json
-echo ""
-
-echo -e "${YELLOW}▶ Explain why Mnémlet knows this:${RESET}"
-echo -e "${BOLD}$ curl ${BASE}/api/v1/explain/${PREF_ID}${RESET}"
-curl -fsS "${BASE}/api/v1/explain/${PREF_ID}" | pretty_json
-echo ""
-
-echo -e "${YELLOW}▶ Inspectable vault file:${RESET}"
-VAULT_FILE="$(find "${DATA_DIR}/vault/preferences" -name "${PREF_ID}.md" | sort | tail -1)"
-echo -e "${BOLD}$ sed -n '1,16p' ${VAULT_FILE#${DATA_DIR}/}${RESET}"
-sed -n '1,16p' "${VAULT_FILE}"
-echo ""
-
-echo -e "${GREEN}${BOLD}Mnémlet runs locally. Your agents wake up with memory they can inspect.${RESET}"
+echo -e "${GREEN}${BOLD}Mnémlet runs locally with throwaway auth, sanitized audit, and inspectable trust metadata.${RESET}"
 echo -e "${DIM}github.com/christoph/mnemlet${RESET}"

@@ -1,57 +1,58 @@
 # Security Policy
 
-## Current State (v0.1.0)
+## Current State (v0.3 Trust / Security / Privacy)
 
-Mnémlet is **local-only infrastructure**. It binds to `127.0.0.1` by default and is designed to run on a trusted local network — typically the same machine as your AI agents (OpenWebUI, OpenCode, OpenClaw, etc.).
+Mnémlet is local-first infrastructure. It binds to `127.0.0.1` by default and is designed to run near your AI agents on hardware you control.
 
-### What we have
+Do not expose Mnémlet directly to the public internet. If you need remote access, put it behind your own trusted network boundary such as SSH, WireGuard, Tailscale, or a reverse proxy you already operate securely.
 
-- **Localhost binding**: Default bind is `127.0.0.1:4050`. The MCP endpoint at `/mcp` is only reachable locally.
-- **No plaintext secrets on disk**: OAuth tokens and API keys are not stored by Mnémlet. It doesn't connect to third-party services unless you explicitly configure optional backends (Ollama, SearXNG).
-- **OS-level file permissions**: The vault (`~/.mnemlet/vault/`) and database (`~/.mnemlet/mnemlet.db`) use standard Unix permissions. Set restrictive permissions if you run multi-user.
+## Recommended Auth Mode
 
-### What we do NOT have (yet)
+Generate one API key and run the server with that key configured:
 
-- **No authentication**: The REST API and MCP endpoint have no auth layer. Anyone who can reach `localhost:4050` can read and write memories.
-- **No encryption at rest**: The SQLite database and Markdown vault are stored unencrypted.
-- **No rate limiting on the API**: A local process could flood the server.
-- **No TLS**: Traffic between agents and Mnémlet is unencrypted (but it's on localhost).
-- **No audit logging**: API calls are not logged beyond what the server prints to stdout.
+```bash
+mnemlet auth generate-key
+export MNEMLET_API_KEY="mnemlet_..."
+mnemlet serve
+```
 
-### What this means
+REST and MCP clients then send the key with `X-Mnemlet-Key`. Development mode can run without a key when bound to localhost, but that mode is only for trusted local use.
 
-> Treat Mnémlet like a local database, not a public service. Do not expose it to the internet. Do not run it on a shared machine with untrusted users.
+## Secret Guard
 
-## Planned Improvements
+Secret Guard scans write-path content for common secret-like values such as API keys, bearer tokens, and password assignments. Namespace policy can block, warn, or allow matching writes.
 
-| Feature | Target Version |
-|---|---|
-| API key authentication | v0.3 |
-| Rate limiting | v0.3 |
-| TLS support | v0.4 |
-| Audit logging | v0.4 |
-| Encryption at rest | later |
+Limitations:
 
-## Reporting
+- Regex scanning is a safety net, not a data-loss-prevention system.
+- It can miss unusual or encoded secrets.
+- It can flag harmless test strings.
+- It does not encrypt existing vault or database content.
 
-Found a security issue? Please report it privately by opening a GitHub issue with the title `[SECURITY]` and a description. Do not disclose publicly until resolved.
+## Audit Log
+
+Mnémlet records sanitized audit events for relevant REST and MCP actions, including auth denials, review actions, Secret Guard outcomes, policy changes, and audit reads. The log is intended for local troubleshooting and trust review. It avoids storing raw secret material, but it is not a tamper-proof security ledger.
+
+## Still Out Of Scope
+
+- Encryption at rest for the SQLite database and Markdown vault.
+- Multi-user auth, per-agent RBAC, or tenant isolation.
+- Built-in TLS termination.
+- Public internet hardening.
+
+Namespaces are organizational trust boundaries. If you need hard isolation between agents, run separate Mnémlet instances with separate data directories and ports.
+
+## Responsible Disclosure
+
+Found a security issue? Please report it privately by opening a GitHub issue titled `[SECURITY]` with a concise description and reproduction notes, or contact the maintainer through the private channel listed on the project profile if available. Do not disclose publicly until the issue is resolved.
 
 ## Dependencies
 
 Mnémlet relies on:
-- **ChromaDB** (vector storage)
-- **SQLite** (metadata and FTS5)
-- **onnxruntime** (local embeddings)
-- **FastAPI/uvicorn** (HTTP server)
 
-All dependencies are pinned in `pyproject.toml`. We monitor for critical CVEs in these packages.
+- **ChromaDB** for vector storage.
+- **SQLite** for metadata, FTS5, and audit storage.
+- **onnxruntime** for local embeddings.
+- **FastAPI/uvicorn** for the HTTP server.
 
-## MCP Security
-
-The MCP server exposes 8 tools. In the current version, any MCP client connecting to `localhost:4050/mcp` has full access to all tools. There is no tool-level access control or per-agent permission model. This means:
-
-- An agent with MCP access can read ANY namespace
-- An agent with MCP access can write to ANY namespace
-- An agent with MCP access can modify decay configurations
-
-Namespace isolation is *organizational*, not *security*. If you need hard isolation between agents, run separate Mnémlet instances on different ports.
+Dependencies are pinned in `pyproject.toml`; critical CVEs should be treated as security bugs.

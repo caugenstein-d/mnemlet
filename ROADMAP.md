@@ -10,25 +10,26 @@ Memory Intelligence Core, Benchmark Suite, OpenWebUI / OpenCode
 integration, Quality Hardening. Full notes in
 [CHANGELOG.md](CHANGELOG.md).
 
-## Next — v0.3 (Trust / Security / Privacy)
+## Current — v0.3 (Trust / Security / Privacy)
 
 Spec: [`v0.3 publication-grade Trust / Security / Privacy design`](docs/superpowers/specs/2026-05-26-v0.3-publication-trust-security-privacy-design.md).
 
-The v0.3 **P0 ("Muss haben")** set from the spec, in priority order:
+The v0.3 **P0 ("Muss haben")** set from the spec:
 
-- **Single API Key Auth** — protect against accidental exposure on a
-  homelab port-scan. No-auth is no-go beyond v0.2.
-- **Secret Regex Guard** — refuse to ingest API keys, tokens, and
-  passwords. Saves a human from themselves.
-- **Audit Log** — full trail of who/what/why for every change.
-  Foundation for the v0.3 "Why do you know this?" (Explain+) work.
-- **Startup-Security-Check** — warn at startup when configuration is
-  unsafe (`0.0.0.0` bind, missing key, world-readable data files).
+- **Single API Key Auth** — `X-Mnemlet-Key` protection for REST and MCP
+  when `MNEMLET_API_KEY` or `[auth].api_key` is configured.
+- **Secret Guard** — block, warn, or allow configured write-path
+  secret-like content by namespace policy.
+- **Audit Log** — sanitized trail for auth, write, review, policy, and
+  security-relevant actions.
+- **Startup Security Checks** — warn when configuration is unsafe, such
+  as non-local binds without a key.
 
-The same spec also lists **P1 ("Soll haben")** features — Namespace
-Policies, Explain+ (Trust-Erweiterung), Forget/Replace/Confirm trust
-extensions, Backup / Restore — that build on the P0 set. Treat them as
-v0.3-stretch, not v0.3-required.
+The same spec also lists **P1 ("Soll haben")** features. Namespace
+Policies, Explain+ trust blocks, protected Forget confirmation,
+Secret Guard action policy, and Backup / Restore are now part of the
+v0.3 release surface. Publish and PyPI language remains gated until
+final release approval.
 
 ## Later — open questions, not promises
 

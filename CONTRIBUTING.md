@@ -80,3 +80,7 @@ moves any of these numbers.
 
 See [SECURITY.md](SECURITY.md). Do not file vulnerabilities as public
 issues.
+
+Security-sensitive changes need focused tests for API-key auth, Audit
+events, Secret Guard block/warn/allow behavior, and no leakage of raw
+secret material into responses, audit rows, logs, docs, or fixtures.

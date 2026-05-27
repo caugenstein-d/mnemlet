@@ -29,12 +29,13 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 - 🧠 **Exponential decay + interaction-weighting** — Memories you recall and update stay sharp. What you ignore fades. No infinite hoarding.
 - 😴 **Sleep Engine** — Nightly consolidation runs while you're away: deduplicate, rescore stale memories, cluster related knowledge, and generate a morning briefing. Like your brain during REM sleep.
 - 🔌 **MCP-native with 14 tools** — `mnemlet_ingest`/`mnemlet_recall`/`mnemlet_search` for the basics, `mnemlet_context`/`mnemlet_explain` for context packs with provenance, `mnemlet_remember`/`mnemlet_forget`/`mnemlet_replace`/`mnemlet_confirm` for memory review, plus `mnemlet_status`/`mnemlet_namespaces`/`mnemlet_update`/`mnemlet_decay_config`/`mnemlet_export` for admin. Works with OpenWebUI, OpenClaw, Claude Code, Cursor, or any MCP client.
+- 🛡️ **v0.3 Trust / Security / Privacy** — API-key auth, Secret Guard write protection, sanitized Audit logs, namespace trust policies, and backup/restore for local-first operators.
 - 📂 **Inspectable Markdown vault** — Every memory as a `.md` file with YAML frontmatter. Open in Obsidian. `grep` it. `git` it. No black box database lock-in.
 - 🤖 **Optional local LLM** — Plug in Gemma3:4b via Ollama. Runs CPU-only on a Pi. Enhances sleep consolidation (contradiction detection, summarization).
 - 🔍 **Hybrid search** — BM25 (SQLite FTS5) + vector similarity (ChromaDB). Both local, both free.
 - 🥧 **Pi-ready** — 450 MB RAM baseline, ~4 GB with LLM. Runs on a Raspberry Pi 5 (16 GB recommended for the full stack).
 - 💰 **Zero API costs** — Local ONNX embeddings (all-MiniLM-L6-v2). No OpenAI key, no cloud embedding service, no per-call charges. SearXNG optionally self-hosted for web enrichment.
-- 🐍 **Python SDK, REST API, CLI** — install v0.2.0 from the GitHub tag for now, then `mnemlet serve`. PyPI follows after the v0.3 Trust/Security layer.
+- 🐍 **Python SDK, REST API, CLI** — install from the GitHub tag for now, then `mnemlet serve`. PyPI follows after final release approval.
 
 ---
 
@@ -75,9 +76,21 @@ pip install git+https://github.com/christoph/mnemlet.git@v0.2.0
 
 ### Start the server
 
+For local development you can run without a key while bound to localhost:
+
 ```bash
 mnemlet serve
 # → http://localhost:4050
+```
+
+Do not expose a no-key server beyond your own machine.
+
+Recommended setup for daily use:
+
+```bash
+mnemlet auth generate-key
+export MNEMLET_API_KEY="mnemlet_..."
+mnemlet serve
 ```
 
 ### Store your first memory
@@ -85,6 +98,7 @@ mnemlet serve
 ```bash
 curl -X POST http://localhost:4050/api/v1/ingest \
   -H 'Content-Type: application/json' \
+  -H "X-Mnemlet-Key: $MNEMLET_API_KEY" \
   -d '{"content":"I prefer dark mode in all editors","namespace":"preferences","importance":0.9}'
 ```
 
@@ -93,6 +107,7 @@ curl -X POST http://localhost:4050/api/v1/ingest \
 ```bash
 curl -X POST http://localhost:4050/api/v1/recall \
   -H 'Content-Type: application/json' \
+  -H "X-Mnemlet-Key: $MNEMLET_API_KEY" \
   -d '{"query":"editor preferences","namespace":"preferences"}'
 ```
 
@@ -112,8 +127,19 @@ print(results)
 Add to any MCP client config:
 
 ```json
-{"mcpServers": {"mnemlet": {"url": "http://localhost:4050/mcp"}}}
+{"mcpServers": {"mnemlet": {"url": "http://localhost:4050/mcp", "headers": {"X-Mnemlet-Key": "mnemlet_..."}}}}
 ```
+
+OpenWebUI and OpenCode should pass the same token as `X-Mnemlet-Key` when connecting to REST or MCP. Prefer an environment variable such as `MNEMLET_API_KEY` in the client process or secret store; do not paste real tokens into public configs, screenshots, or issue reports.
+
+### Backup and restore
+
+```bash
+mnemlet backup --output ~/mnemlet-backups
+mnemlet restore --input ~/mnemlet-backups/mnemlet-backup-...tar.gz --yes
+```
+
+Backups include the Markdown vault, SQLite database, Chroma data, and redacted configuration metadata. Stop your server or ensure it is idle before restoring.
 
 ---
 
@@ -268,7 +294,7 @@ So I built something that runs on hardware I own, stores memories as files I can
 
 ## What Mnémlet Is NOT
 
-- **Not a Mem0 competitor for enterprise teams.** This is a solo tool, built for solo setups. It has no auth layers, no multi-tenancy, no cloud offering, and no VC funding behind it.
+- **Not a Mem0 competitor for enterprise teams.** This is a solo tool, built for solo setups. It has single-key local auth, not multi-tenancy, a cloud offering, or VC funding behind it.
 - **Not a cloud service.** There is no `app.mnemlet.ai`. There never will be. If you want managed hosting, look at Mem0.
 - **Not a production database.** It's AA-battery-grade infrastructure — simple, local, sufficient for one person's context. Don't use it to store customer PII or medical records.
 - **Not a replacement for your notes app.** The Markdown vault is inspectable, but it's not designed for manual note-taking. Use Obsidian for that. Use Mnémlet for agent memory.
@@ -312,7 +338,7 @@ Honest forward look in [ROADMAP.md](ROADMAP.md). Short version: v0.3 adds the Tr
 
 ## Security
 
-By default, Mnémlet binds to `127.0.0.1` only. There is no authentication layer yet — treat it as a local service. Do not expose it to the public internet. Production auth is planned for v0.3.
+By default, Mnémlet binds to `127.0.0.1` only. Configure `MNEMLET_API_KEY` or `[auth].api_key` for API-key protection with the `X-Mnemlet-Key` header. Secret Guard blocks or warns on configured write-path secret-like content, and the Audit log records sanitized security and review actions. Do not expose Mnémlet directly to the public internet; put any remote access behind your own trusted network boundary.
 
 ---
 
