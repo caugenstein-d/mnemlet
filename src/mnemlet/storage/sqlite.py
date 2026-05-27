@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mnemlet.constants import MEMORY_STATUSES, MEMORY_TYPES
+from mnemlet.security.audit import AuditEvent
 
 
 SCHEMA = """
@@ -61,11 +62,27 @@ CREATE TABLE IF NOT EXISTS graph_edges (
     metadata_json TEXT DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    action TEXT NOT NULL,
+    memory_id TEXT DEFAULT NULL,
+    namespace TEXT NOT NULL,
+    caller TEXT NOT NULL,
+    caller_identity TEXT DEFAULT NULL,
+    result TEXT NOT NULL,
+    details_json TEXT DEFAULT '{}'
+);
+
 CREATE INDEX IF NOT EXISTS idx_memories_namespace ON memories(namespace);
 CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
 CREATE INDEX IF NOT EXISTS idx_memories_retention ON memories(retention_score);
 CREATE INDEX IF NOT EXISTS idx_interactions_memory ON interactions(memory_id);
 CREATE INDEX IF NOT EXISTS idx_interactions_agent ON interactions(agent_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_log_namespace ON audit_log(namespace);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_memory ON audit_log(memory_id);
 
 CREATE TRIGGER IF NOT EXISTS memories_fts_insert AFTER INSERT ON memories BEGIN
     INSERT INTO memories_fts(rowid, content_preview, namespace, metadata_json)
@@ -252,6 +269,66 @@ class MnemletDB:
         )
         self.conn.commit()
         return self.get_memory(memory_id)
+
+    def record_audit(self, event: AuditEvent) -> dict[str, Any]:
+        """Persist an audit event and return the stored row."""
+        now = datetime.now(timezone.utc).isoformat()
+        self.conn.execute(
+            """INSERT INTO audit_log
+               (timestamp, action, memory_id, namespace, caller, caller_identity, result, details_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                now,
+                event.action,
+                event.memory_id,
+                event.namespace,
+                event.caller,
+                event.caller_identity,
+                event.result,
+                json.dumps(event.details, ensure_ascii=False),
+            ),
+        )
+        self.conn.commit()
+        row = self.conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
+        return self._audit_row_to_dict(row)
+
+    def _audit_row_to_dict(self, row: sqlite3.Row | None) -> dict[str, Any]:
+        """Convert an audit row to API shape."""
+        if row is None:
+            return {}
+        item = dict(row)
+        try:
+            item["details"] = json.loads(item.pop("details_json") or "{}")
+        except json.JSONDecodeError:
+            item["details"] = {}
+        return item
+
+    def query_audit(
+        self,
+        namespace: str | None = None,
+        action: str | None = None,
+        since: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Query audit events with optional filters."""
+        clauses = []
+        params: list[Any] = []
+        if namespace:
+            clauses.append("namespace = ?")
+            params.append(namespace)
+        if action:
+            clauses.append("action = ?")
+            params.append(action)
+        if since:
+            clauses.append("timestamp >= ?")
+            params.append(since)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        params.append(max(1, min(limit, 500)))
+        rows = self.conn.execute(
+            f"SELECT * FROM audit_log{where} ORDER BY timestamp DESC, id DESC LIMIT ?",
+            tuple(params),
+        ).fetchall()
+        return [self._audit_row_to_dict(row) for row in rows]
 
     def _sanitize_fts_query(self, query: str) -> str:
         """Sanitize user input for FTS5 MATCH queries.

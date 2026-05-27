@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mnemlet import __version__
 from mnemlet.config import MnemletConfig
+from mnemlet.security.audit import AuditEvent, AuditResult
 from mnemlet.security.auth import extract_request_key, validate_api_key
 from mnemlet.security.startup_check import run_startup_security_checks
 from mnemlet.storage.sqlite import MnemletDB
@@ -20,7 +21,7 @@ from mnemlet.engine.ingest import IngestEngine
 from mnemlet.engine.recall import RecallEngine
 from mnemlet.engine.decay import DecayEngine
 from mnemlet.engine.sleep import SleepEngine
-from mnemlet.server.routes import context, decay, explain, ingest, recall, review, sleep, status
+from mnemlet.server.routes import audit, context, decay, explain, ingest, recall, review, sleep, status
 from mnemlet.server.mcp_server import create_mcp_server
 
 
@@ -32,6 +33,66 @@ def _get_mcp_session_manager(mcp_app: Any) -> Any:
         if session_manager is not None:
             return session_manager
     raise RuntimeError("FastMCP session manager route endpoint not found")
+
+
+def _audit_action_from_request(request: Request) -> str:
+    """Map a REST request path to a coarse audit action."""
+    path = request.url.path
+    if path.endswith("/ingest") or path.endswith("/remember"):
+        return "ingest"
+    if "/recall" in path or "/context" in path:
+        return "recall"
+    if "/explain" in path:
+        return "explain"
+    if "/forget" in path:
+        return "forget"
+    if "/replace" in path:
+        return "replace"
+    if "/confirm" in path:
+        return "confirm"
+    if "/audit" in path:
+        return "audit"
+    return "request"
+
+
+def _audit_namespace_from_request(request: Request) -> str:
+    """Derive a sanitized namespace value without reading request bodies."""
+    namespace = request.query_params.get("namespace")
+    if namespace:
+        return namespace
+    parts = request.url.path.strip("/").split("/")
+    if "namespaces" in parts:
+        index = parts.index("namespaces") + 1
+        if index < len(parts):
+            return parts[index]
+    return "default"
+
+
+def _record_request_audit(request: Request, result: AuditResult, status_code: int | None = None) -> None:
+    """Record sanitized audit data when the database is available."""
+    db = getattr(request.app.state, "db", None)
+    if db is None:
+        return
+    decision = getattr(request.state, "auth_decision", None)
+    details: dict[str, object] = {
+        "method": request.method,
+        "path": request.url.path,
+    }
+    if status_code is not None:
+        details["status_code"] = status_code
+    reason = getattr(decision, "reason", None)
+    if reason:
+        details["reason"] = reason
+    db.record_audit(
+        AuditEvent(
+            action=_audit_action_from_request(request),
+            namespace=_audit_namespace_from_request(request),
+            caller="rest",
+            caller_identity=getattr(decision, "caller_identity", None),
+            result=result,
+            details=details,
+        )
+    )
 
 
 @asynccontextmanager
@@ -143,8 +204,19 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         response = await call_next(request)
         return response
 
+    @app.middleware("http")
+    async def audit_rest_request(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        """Record one sanitized audit event per authenticated REST request."""
+        response = await call_next(request)
+        if request.url.path.startswith("/api/v1"):
+            _record_request_audit(request, "success", response.status_code)
+        return response
+
     # Decorator middleware executes in reverse declaration order; keep auth last
-    # so rejected requests cannot bump sleep activity.
+    # so rejected requests cannot bump sleep activity or request audit middleware.
     @app.middleware("http")
     async def require_api_key(
         request: Request,
@@ -156,9 +228,11 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         decision = validate_api_key(configured_key, provided_key)
         request.state.auth_decision = decision
         if not decision.allowed:
+            _record_request_audit(request, "denied", 401)
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
         return await call_next(request)
 
+    app.include_router(audit.router)
     app.include_router(context.router)
     app.include_router(decay.router)
     app.include_router(ingest.router)
