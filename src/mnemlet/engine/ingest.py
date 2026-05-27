@@ -45,6 +45,12 @@ class IngestEngine:
             metadata["secret_guard_patterns"] = sorted(
                 {finding.pattern_type for finding in guard_result.findings}
             )
+        if guard_result.action == "allow":
+            secret_guard_result = "allow"
+        elif not guard_result.clean and guard_result.action == "warn":
+            secret_guard_result = "warning"
+        else:
+            secret_guard_result = "clean"
 
         chunks = self._chunk(content)
 
@@ -78,6 +84,12 @@ class IngestEngine:
                 content_hash=content_hash,
                 importance=importance,
                 metadata=metadata,
+            )
+            self.db.update_memory_trust(
+                memory_id,
+                ingested_by=caller,
+                caller_identity=caller_identity,
+                secret_guard_result=secret_guard_result,
             )
             if memory_type is not None:
                 self.db.update_memory_type(

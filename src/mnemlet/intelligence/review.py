@@ -71,5 +71,6 @@ class ReviewService:
             return {"error": f"Memory {memory_id} not found"}
         new_score = min(1.0, float(memory["retention_score"]) + BOOST_CONFIRM)
         self.db.update_score(memory_id, new_score)
+        self.db.increment_confirmation_count(memory_id)
         self.db.record_interaction(memory_id, "confirm", agent_id="api")
         return self.db.get_memory(memory_id)

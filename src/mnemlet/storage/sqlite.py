@@ -112,6 +112,14 @@ INTELLIGENCE_MEMORY_COLUMNS: dict[str, str] = {
 }
 
 
+TRUST_MEMORY_COLUMNS: dict[str, str] = {
+    "ingested_by": "TEXT DEFAULT NULL",
+    "caller_identity": "TEXT DEFAULT NULL",
+    "secret_guard_result": "TEXT DEFAULT NULL",
+    "confirmation_count": "INTEGER DEFAULT 0",
+}
+
+
 class MnemletDB:
     """SQLite database for Mnemlet.
 
@@ -133,6 +141,7 @@ class MnemletDB:
         self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.executescript(SCHEMA)
         self._ensure_intelligence_schema()
+        self._ensure_trust_schema()
         self._lock = None  # Lock not included by default; add if needed
         self.conn.commit()
 
@@ -152,6 +161,16 @@ class MnemletDB:
         """Add v0.2 intelligence columns to existing databases idempotently."""
         columns = self._table_columns("memories")
         for column_name, column_sql in INTELLIGENCE_MEMORY_COLUMNS.items():
+            if column_name not in columns:
+                self.conn.execute(
+                    f"ALTER TABLE memories ADD COLUMN {column_name} {column_sql}"
+                )
+        self.conn.commit()
+
+    def _ensure_trust_schema(self) -> None:
+        """Add v0.3 trust columns to existing databases idempotently."""
+        columns = self._table_columns("memories")
+        for column_name, column_sql in TRUST_MEMORY_COLUMNS.items():
             if column_name not in columns:
                 self.conn.execute(
                     f"ALTER TABLE memories ADD COLUMN {column_name} {column_sql}"
@@ -228,6 +247,36 @@ class MnemletDB:
         self.conn.execute(
             "UPDATE memories SET status = ?, superseded_by = COALESCE(?, superseded_by) WHERE id = ?",
             (status, superseded_by, memory_id),
+        )
+        self.conn.commit()
+        return self.get_memory(memory_id)
+
+    def update_memory_trust(
+        self,
+        memory_id: str,
+        ingested_by: str | None = None,
+        caller_identity: str | None = None,
+        secret_guard_result: str | None = None,
+    ) -> dict | None:
+        """Update v0.3 trust fields for a memory."""
+        self.conn.execute(
+            """UPDATE memories
+               SET ingested_by = COALESCE(?, ingested_by),
+                   caller_identity = COALESCE(?, caller_identity),
+                   secret_guard_result = COALESCE(?, secret_guard_result)
+               WHERE id = ?""",
+            (ingested_by, caller_identity, secret_guard_result, memory_id),
+        )
+        self.conn.commit()
+        return self.get_memory(memory_id)
+
+    def increment_confirmation_count(self, memory_id: str) -> dict | None:
+        """Increment a memory's confirmation count."""
+        self.conn.execute(
+            """UPDATE memories
+               SET confirmation_count = COALESCE(confirmation_count, 0) + 1
+               WHERE id = ?""",
+            (memory_id,),
         )
         self.conn.commit()
         return self.get_memory(memory_id)
