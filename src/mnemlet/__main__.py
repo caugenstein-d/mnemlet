@@ -33,6 +33,15 @@ def main() -> None:
     auth_subparsers = auth_parser.add_subparsers(dest="auth_command", help="Auth commands")
     auth_subparsers.add_parser("generate-key", help="Generate a new API key")
 
+    backup_parser = subparsers.add_parser("backup", help="Create a Mnémlet backup")
+    backup_parser.add_argument("--output", default=None, help="Directory for the backup archive")
+    backup_parser.add_argument("--config", default=None, help="Path to TOML config file")
+
+    restore_parser = subparsers.add_parser("restore", help="Restore a Mnémlet backup")
+    restore_parser.add_argument("--input", required=True, help="Backup archive to restore")
+    restore_parser.add_argument("--yes", action="store_true", help="Confirm replacing existing data")
+    restore_parser.add_argument("--config", default=None, help="Path to TOML config file")
+
     args = parser.parse_args()
 
     if args.command == "serve":
@@ -117,6 +126,21 @@ def main() -> None:
         else:
             auth_parser.print_help()
             sys.exit(1)
+    elif args.command == "backup":
+        from mnemlet.backup.backup import create_backup
+
+        config = MnemletConfig.from_toml(args.config) if args.config else MnemletConfig()
+        output_dir = Path(args.output) if args.output else None
+        backup_path = create_backup(config, output_dir=output_dir)
+        print(f"Backup created: {backup_path}")
+    elif args.command == "restore":
+        from mnemlet.backup.restore import restore_backup
+
+        config = MnemletConfig.from_toml(args.config) if args.config else MnemletConfig()
+        result = restore_backup(config, Path(args.input), confirm=args.yes)
+        print(f"Restored from: {result['restored_from']}")
+        print(f"Pre-restore backup: {result['pre_restore_backup']}")
+        print(f"Data directory: {result['data_dir']}")
     else:
         parser.print_help()
         sys.exit(1)
