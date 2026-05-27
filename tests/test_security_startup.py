@@ -81,6 +81,16 @@ def test_config_loads_cors_origins_from_toml(tmp_path: Path) -> None:
     assert cfg.cors_origins == ["http://app.local"]
 
 
+def test_startup_check_warns_when_any_cors_origin_is_wildcard(tmp_path: Path) -> None:
+    """Startup checks warn when any configured CORS origin allows all origins."""
+    config = _config(tmp_path)
+    config.cors_origins = ["*", "http://app.local"]
+
+    checks = run_startup_security_checks(config)
+
+    assert any(c.code == "cors_wildcard" and c.level == "warning" for c in checks)
+
+
 @pytest.mark.asyncio
 async def test_status_exposes_auth_and_security_warnings(tmp_path: Path) -> None:
     """Status reports auth state and startup security warnings."""

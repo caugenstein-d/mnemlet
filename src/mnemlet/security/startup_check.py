@@ -42,6 +42,6 @@ def run_startup_security_checks(config: Any) -> list[SecurityCheck]:
         path = Path(getattr(config, path_attr))
         if _is_group_or_world_readable(path):
             checks.append(SecurityCheck("unsafe_permissions", "warning", f"{path.name} is group/world readable"))
-    if getattr(config, "cors_origins", ["http://localhost", "http://127.0.0.1"]) == ["*"]:
+    if "*" in getattr(config, "cors_origins", ["http://localhost", "http://127.0.0.1"]):
         checks.append(SecurityCheck("cors_wildcard", "warning", "CORS allows all origins"))
     return checks
