@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import tempfile
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from mnemlet.config import MnemletConfig
+from mnemlet.server.app import create_app
 from mnemlet.security.auth import (
     AuthDecision,
     hash_key_identity,
@@ -79,3 +84,82 @@ def test_env_api_key_overrides_file_key(tmp_path: Path, monkeypatch: pytest.Monk
     config = MnemletConfig.from_toml(str(config_path))
 
     assert config.api_key == "mnemlet_env_key_1234567890abcdef"
+
+
+@asynccontextmanager
+async def _auth_client(api_key: str | None) -> AsyncIterator[AsyncClient]:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        config = MnemletConfig(
+            data_dir=base,
+            sqlite_path=base / "mnemlet.db",
+            chroma_path=base / "chroma",
+            vault_path=base / "vault",
+            embedding_cache_dir=base / "models",
+            api_key=api_key,
+        )
+        app = create_app(config)
+        async with app.router.lifespan_context(app):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                yield client
+
+
+@pytest.mark.asyncio
+async def test_rest_allows_without_configured_key() -> None:
+    async with _auth_client(api_key=None) as client:
+        response = await client.get("/api/v1/health")
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_rest_rejects_missing_key_when_configured() -> None:
+    async with _auth_client(api_key="mnemlet_rest_key_1234567890abcdef") as client:
+        response = await client.get("/api/v1/status")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Unauthorized"
+
+
+@pytest.mark.asyncio
+async def test_rest_accepts_x_mnemlet_key_header() -> None:
+    key = "mnemlet_rest_key_1234567890abcdef"
+    async with _auth_client(api_key=key) as client:
+        response = await client.get("/api/v1/status", headers={"X-Mnemlet-Key": key})
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_rest_accepts_bearer_header() -> None:
+    key = "mnemlet_rest_key_1234567890abcdef"
+    async with _auth_client(api_key=key) as client:
+        response = await client.get("/api/v1/status", headers={"Authorization": f"Bearer {key}"})
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_rest_rejects_wrong_key() -> None:
+    async with _auth_client(api_key="mnemlet_rest_key_1234567890abcdef") as client:
+        response = await client.get("/api/v1/status", headers={"X-Mnemlet-Key": "wrong"})
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_auth_middleware_protects_mcp_mount() -> None:
+    async with _auth_client(api_key="mnemlet_rest_key_1234567890abcdef") as client:
+        response = await client.post("/mcp", content=b"")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_mcp_mount_accepts_configured_key_before_body_validation() -> None:
+    key = "mnemlet_rest_key_1234567890abcdef"
+    async with _auth_client(api_key=key) as client:
+        response = await client.post("/mcp", headers={"X-Mnemlet-Key": key}, content=b"")
+
+    assert response.status_code != 401

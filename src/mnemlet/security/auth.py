@@ -50,3 +50,14 @@ def validate_api_key(configured_key: str | None, provided_key: str | None) -> Au
             caller_identity=hash_key_identity(str(configured_key)),
         )
     return AuthDecision(allowed=False, authenticated=False, reason="invalid_api_key")
+
+
+def extract_request_key(headers: dict[str, str]) -> str | None:
+    """Extract a Mnémlet API key from supported HTTP headers."""
+    direct = headers.get("x-mnemlet-key") or headers.get("X-Mnemlet-Key")
+    if direct:
+        return direct
+    authorization = headers.get("authorization") or headers.get("Authorization")
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return None

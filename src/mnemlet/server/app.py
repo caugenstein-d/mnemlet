@@ -7,8 +7,10 @@ from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from mnemlet import __version__
 from mnemlet.config import MnemletConfig
+from mnemlet.security.auth import extract_request_key, validate_api_key
 from mnemlet.security.startup_check import run_startup_security_checks
 from mnemlet.storage.sqlite import MnemletDB
 from mnemlet.storage.chroma import MnemletChroma
@@ -129,6 +131,20 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def require_api_key(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        """Require API key when configured."""
+        configured_key = getattr(request.app.state.config, "api_key", None)
+        provided_key = extract_request_key(dict(request.headers))
+        decision = validate_api_key(configured_key, provided_key)
+        request.state.auth_decision = decision
+        if not decision.allowed:
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+        return await call_next(request)
 
     @app.middleware("http")
     async def track_activity(

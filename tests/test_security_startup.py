@@ -106,8 +106,9 @@ async def test_status_exposes_auth_and_security_warnings(tmp_path: Path) -> None
 @pytest.mark.asyncio
 async def test_status_reports_auth_configured(tmp_path: Path) -> None:
     """Status reports when API-key auth is configured."""
-    async with _client(_config(tmp_path, api_key="mnemlet_test_key_1234567890abcdef")) as client:
-        response = await client.get("/api/v1/status")
+    api_key = "mnemlet_test_key_1234567890abcdef"
+    async with _client(_config(tmp_path, api_key=api_key)) as client:
+        response = await client.get("/api/v1/status", headers={"X-Mnemlet-Key": api_key})
 
     assert response.status_code == 200
     assert response.json()["security"]["auth_configured"] is True
