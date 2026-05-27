@@ -133,6 +133,19 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
     )
 
     @app.middleware("http")
+    async def track_activity(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        """Bump sleep engine activity on every API call."""
+        if hasattr(request.app.state, 'sleep_engine'):
+            request.app.state.sleep_engine.bump_activity()
+        response = await call_next(request)
+        return response
+
+    # Decorator middleware executes in reverse declaration order; keep auth last
+    # so rejected requests cannot bump sleep activity.
+    @app.middleware("http")
     async def require_api_key(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
@@ -145,17 +158,6 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         if not decision.allowed:
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
         return await call_next(request)
-
-    @app.middleware("http")
-    async def track_activity(
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]],
-    ) -> Response:
-        """Bump sleep engine activity on every API call."""
-        if hasattr(request.app.state, 'sleep_engine'):
-            request.app.state.sleep_engine.bump_activity()
-        response = await call_next(request)
-        return response
 
     app.include_router(context.router)
     app.include_router(decay.router)

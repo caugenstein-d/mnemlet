@@ -105,6 +105,16 @@ async def _auth_client(api_key: str | None) -> AsyncIterator[AsyncClient]:
                 yield client
 
 
+class _CountingSleepEngine:
+    """Sleep engine test double that tracks activity bumps."""
+
+    def __init__(self) -> None:
+        self.bump_count = 0
+
+    def bump_activity(self) -> None:
+        self.bump_count += 1
+
+
 @pytest.mark.asyncio
 async def test_rest_allows_without_configured_key() -> None:
     async with _auth_client(api_key=None) as client:
@@ -146,6 +156,36 @@ async def test_rest_rejects_wrong_key() -> None:
         response = await client.get("/api/v1/status", headers={"X-Mnemlet-Key": "wrong"})
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_rejected_rest_auth_does_not_bump_activity() -> None:
+    key = "mnemlet_rest_key_1234567890abcdef"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        config = MnemletConfig(
+            data_dir=base,
+            sqlite_path=base / "mnemlet.db",
+            chroma_path=base / "chroma",
+            vault_path=base / "vault",
+            embedding_cache_dir=base / "models",
+            api_key=key,
+        )
+        app = create_app(config)
+        async with app.router.lifespan_context(app):
+            sleep_engine = _CountingSleepEngine()
+            app.state.sleep_engine = sleep_engine
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                missing_response = await client.get("/api/v1/status")
+                wrong_response = await client.get(
+                    "/api/v1/status",
+                    headers={"X-Mnemlet-Key": "wrong"},
+                )
+
+    assert missing_response.status_code == 401
+    assert wrong_response.status_code == 401
+    assert sleep_engine.bump_count == 0
 
 
 @pytest.mark.asyncio
