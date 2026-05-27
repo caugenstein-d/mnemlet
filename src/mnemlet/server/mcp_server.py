@@ -146,11 +146,11 @@ def create_mcp_server(app_state) -> FastMCP:
         return result
 
     @mcp.tool()
-    async def mnemlet_forget(memory_id: str) -> dict:
+    async def mnemlet_forget(memory_id: str, confirm: bool = False) -> dict:
         """Mark a memory as forgotten without deleting it."""
         from mnemlet.intelligence.review import ReviewService
 
-        result = ReviewService(app_state.db, app_state.ingest_engine).forget(memory_id)
+        result = ReviewService(app_state.db, app_state.ingest_engine).forget(memory_id, confirm=confirm)
         record_mcp_audit("forget", namespace=result.get("namespace"), memory_id=memory_id)
         return result
 

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from mnemlet import __version__
@@ -81,7 +81,10 @@ async def set_namespace_policy(
     request: Request,
 ) -> dict[str, str]:
     """Set one namespace policy."""
-    return request.app.state.db.set_namespace_policy(namespace, policy_key, req.value)
+    try:
+        return request.app.state.db.set_namespace_policy(namespace, policy_key, req.value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/namespaces/{namespace}/decay")

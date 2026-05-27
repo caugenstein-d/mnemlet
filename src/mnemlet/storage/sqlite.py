@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 from mnemlet.constants import MEMORY_STATUSES, MEMORY_TYPES
 from mnemlet.security.audit import AuditEvent
-from mnemlet.security.namespace_policies import DEFAULT_POLICIES
+from mnemlet.security.namespace_policies import DEFAULT_POLICIES, validate_namespace_policy_value
 
 
 SCHEMA = """
@@ -400,8 +400,7 @@ class MnemletDB:
 
     def set_namespace_policy(self, namespace: str, key: str, value: str) -> dict[str, str]:
         """Insert or update one namespace policy value."""
-        if key not in DEFAULT_POLICIES:
-            raise ValueError(f"unknown namespace policy: {key}")
+        validated_value = validate_namespace_policy_value(key, value)
         now = datetime.now(timezone.utc).isoformat()
         self.conn.execute(
             """INSERT INTO namespace_policies (namespace, policy_key, policy_value, updated_at)
@@ -409,10 +408,10 @@ class MnemletDB:
                ON CONFLICT(namespace, policy_key) DO UPDATE SET
                policy_value = excluded.policy_value,
                updated_at = excluded.updated_at""",
-            (namespace, key, value, now),
+            (namespace, key, validated_value, now),
         )
         self.conn.commit()
-        return {"namespace": namespace, "policy_key": key, "policy_value": value}
+        return {"namespace": namespace, "policy_key": key, "policy_value": validated_value}
 
     def list_namespace_policies(self, namespace: str) -> dict[str, str]:
         """List effective namespace policies including defaults."""
