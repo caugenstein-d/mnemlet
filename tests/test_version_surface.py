@@ -71,5 +71,5 @@ async def test_status_endpoint_reports_package_version() -> None:
 
 def test_mcp_module_docstring_names_current_tool_count() -> None:
     """MCP module documentation does not advertise the old 8-tool surface."""
-    assert "14 tools" in (mcp_server.__doc__ or "")
+    assert "15 tools" in (mcp_server.__doc__ or "")
     assert "8 tools" not in (mcp_server.__doc__ or "")

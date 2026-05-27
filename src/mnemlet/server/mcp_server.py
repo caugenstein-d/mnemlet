@@ -1,15 +1,52 @@
-"""MCP (Model Context Protocol) server for Mnemlet — 14 tools."""
+"""MCP (Model Context Protocol) server for Mnemlet - 15 tools."""
 
 import json
+from typing import Any
+
 from mcp.server.fastmcp import FastMCP
 
 from mnemlet import __version__
+from mnemlet.security.audit import AuditEvent
 
 
 def create_mcp_server(app_state) -> FastMCP:
     """Create an MCP server wired to the Mnemlet app state."""
     mcp = FastMCP("Mnemlet Memory Engine")
     mcp.settings.streamable_http_path = "/"
+    original_streamable_http_app = mcp.streamable_http_app
+
+    def streamable_http_app_with_mcp_reference() -> Any:
+        """Create the ASGI app and expose the FastMCP server for in-process tests."""
+        mcp_app = original_streamable_http_app()
+        if mcp._session_manager is not None:
+            setattr(mcp._session_manager, "_mcp_server", mcp)
+        return mcp_app
+
+    mcp.streamable_http_app = streamable_http_app_with_mcp_reference
+
+    def record_mcp_audit(
+        action: str,
+        namespace: str | None = None,
+        memory_id: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Record sanitized MCP tool activity without request bodies or secrets."""
+        app_state.db.record_audit(
+            AuditEvent(
+                action=action,
+                namespace=namespace or "default",
+                caller="mcp",
+                memory_id=memory_id,
+                details=details or {},
+            )
+        )
+
+    def first_memory_id(result: dict[str, Any]) -> str | None:
+        """Return the primary memory id from an MCP tool result."""
+        memory_id = result.get("memory_id") or result.get("id")
+        if isinstance(memory_id, list):
+            return str(memory_id[0]) if memory_id else None
+        return str(memory_id) if memory_id is not None else None
 
     @mcp.tool()
     async def mnemlet_ingest(
@@ -19,7 +56,9 @@ def create_mcp_server(app_state) -> FastMCP:
     ) -> dict:
         """Store a new memory. Returns metadata about the stored memory."""
         engine = app_state.ingest_engine
-        return engine.ingest(content=content, namespace=namespace, importance=importance)
+        result = engine.ingest(content=content, namespace=namespace, importance=importance)
+        record_mcp_audit("ingest", namespace=namespace, memory_id=first_memory_id(result))
+        return result
 
     @mcp.tool()
     async def mnemlet_recall(
@@ -30,6 +69,7 @@ def create_mcp_server(app_state) -> FastMCP:
         """Retrieve relevant memories for a query. Returns list of matching memories with scores."""
         engine = app_state.recall_engine
         results = engine.recall(query=query, namespace=namespace, limit=min(limit, 10))
+        record_mcp_audit("recall", namespace=namespace, details={"count": len(results)})
         return {"results": results, "count": len(results)}
 
     @mcp.tool()
@@ -52,6 +92,7 @@ def create_mcp_server(app_state) -> FastMCP:
             min_score=min_score,
             include_statuses=recall_statuses(include_superseded=include_superseded),
         )
+        record_mcp_audit("context", namespace=namespace, details={"count": len(results)})
         return build_context_pack(query, results, include_superseded=include_superseded)
 
     @mcp.tool()
@@ -59,7 +100,9 @@ def create_mcp_server(app_state) -> FastMCP:
         """Explain provenance and lifecycle metadata for a memory."""
         from mnemlet.intelligence.provenance import explain_memory
 
-        return explain_memory(app_state.db, memory_id)
+        result = explain_memory(app_state.db, memory_id)
+        record_mcp_audit("explain", namespace=result.get("namespace"), memory_id=memory_id)
+        return result
 
     @mcp.tool()
     async def mnemlet_remember(
@@ -75,28 +118,36 @@ def create_mcp_server(app_state) -> FastMCP:
                 raise ValueError(f"invalid memory type: {memory_type}")
         from mnemlet.intelligence.review import ReviewService
 
-        return ReviewService(app_state.db, app_state.ingest_engine).remember(content, namespace, importance, memory_type)
+        result = ReviewService(app_state.db, app_state.ingest_engine).remember(content, namespace, importance, memory_type)
+        record_mcp_audit("ingest", namespace=namespace, memory_id=first_memory_id(result))
+        return result
 
     @mcp.tool()
     async def mnemlet_forget(memory_id: str) -> dict:
         """Mark a memory as forgotten without deleting it."""
         from mnemlet.intelligence.review import ReviewService
 
-        return ReviewService(app_state.db, app_state.ingest_engine).forget(memory_id)
+        result = ReviewService(app_state.db, app_state.ingest_engine).forget(memory_id)
+        record_mcp_audit("forget", namespace=result.get("namespace"), memory_id=memory_id)
+        return result
 
     @mcp.tool()
     async def mnemlet_replace(memory_id: str, new_content: str, importance: float = 0.5) -> dict:
         """Replace a memory by superseding it and storing a new version."""
         from mnemlet.intelligence.review import ReviewService
 
-        return ReviewService(app_state.db, app_state.ingest_engine).replace(memory_id, new_content, importance)
+        result = ReviewService(app_state.db, app_state.ingest_engine).replace(memory_id, new_content, importance)
+        record_mcp_audit("replace", namespace=result.get("namespace"), memory_id=memory_id)
+        return result
 
     @mcp.tool()
     async def mnemlet_confirm(memory_id: str) -> dict:
         """Confirm a memory and boost its retention score."""
         from mnemlet.intelligence.review import ReviewService
 
-        return ReviewService(app_state.db, app_state.ingest_engine).confirm(memory_id)
+        result = ReviewService(app_state.db, app_state.ingest_engine).confirm(memory_id)
+        record_mcp_audit("confirm", namespace=result.get("namespace"), memory_id=memory_id)
+        return result
 
     @mcp.tool()
     async def mnemlet_search(
@@ -121,6 +172,7 @@ def create_mcp_server(app_state) -> FastMCP:
             all_results = all_results[:cap]
         else:
             all_results = engine.recall(query=query, limit=min(limit, 10))
+        record_mcp_audit("search", namespace="default", details={"count": len(all_results)})
         return {"results": all_results, "count": len(all_results)}
 
     @mcp.tool()
@@ -137,13 +189,15 @@ def create_mcp_server(app_state) -> FastMCP:
         interactions = db.conn.execute(
             "SELECT COUNT(*) FROM interactions"
         ).fetchone()[0]
-        return {
+        result = {
             "active_memories": active,
             "cold_storage_memories": cold,
             "total_interactions": interactions,
             "chroma_documents": chroma.count(),
             "version": __version__,
         }
+        record_mcp_audit("status")
+        return result
 
     @mcp.tool()
     async def mnemlet_namespaces(action: str = "list", namespace: str = None) -> dict:
@@ -154,9 +208,11 @@ def create_mcp_server(app_state) -> FastMCP:
                 "SELECT DISTINCT namespace FROM memories "
                 "UNION SELECT namespace FROM decay_configs"
             ).fetchall()
+            record_mcp_audit("namespaces", details={"action": "list"})
             return {"namespaces": [r[0] for r in rows]}
         elif action == "create" and namespace:
             db.set_decay_config(namespace)
+            record_mcp_audit("namespaces", namespace=namespace, details={"action": "create"})
             return {
                 "created": namespace,
                 "note": "namespace will be active on first ingest",
@@ -197,7 +253,9 @@ def create_mcp_server(app_state) -> FastMCP:
             )
 
         db.conn.commit()
-        return db.get_memory(memory_id)
+        result = db.get_memory(memory_id)
+        record_mcp_audit("update", namespace=result.get("namespace"), memory_id=memory_id)
+        return result
 
     @mcp.tool()
     async def mnemlet_decay_config(
@@ -211,7 +269,9 @@ def create_mcp_server(app_state) -> FastMCP:
         if action == "get":
             config = db.get_decay_config(namespace)
             if config:
+                record_mcp_audit("decay_config", namespace=namespace, details={"action": "get"})
                 return config
+            record_mcp_audit("decay_config", namespace=namespace, details={"action": "get"})
             return {
                 "namespace": namespace,
                 "note": "using defaults",
@@ -224,8 +284,27 @@ def create_mcp_server(app_state) -> FastMCP:
                 kwargs["lambda_"] = lambda_
             if purge_threshold is not None:
                 kwargs["purge_threshold"] = purge_threshold
-            return db.set_decay_config(namespace, **kwargs)
+            result = db.set_decay_config(namespace, **kwargs)
+            record_mcp_audit("decay_config", namespace=namespace, details={"action": "set"})
+            return result
         return {"error": "invalid action. Use 'get' or 'set'."}
+
+    @mcp.tool()
+    async def mnemlet_audit(
+        namespace: str = None,
+        action: str = None,
+        since: str = None,
+        limit: int = 100,
+    ) -> dict:
+        """Read recent audit log events."""
+        events = app_state.db.query_audit(
+            namespace=namespace,
+            action=action,
+            since=since,
+            limit=min(limit, 500),
+        )
+        record_mcp_audit("audit", namespace=namespace, details={"count": len(events)})
+        return {"events": events, "count": len(events)}
 
     @mcp.tool()
     async def mnemlet_export(format: str = "json") -> dict:
@@ -239,7 +318,7 @@ def create_mcp_server(app_state) -> FastMCP:
         count = db.conn.execute(
             "SELECT COUNT(*) FROM memories"
         ).fetchone()[0]
-        return {
+        result = {
             "total_memories": count,
             "vault_path": vault_path,
             "export_note": (
@@ -247,5 +326,7 @@ def create_mcp_server(app_state) -> FastMCP:
                 "or mnemlet export CLI for full dump."
             ),
         }
+        record_mcp_audit("export", details={"format": format})
+        return result
 
     return mcp
