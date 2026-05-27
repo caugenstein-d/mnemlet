@@ -1,6 +1,6 @@
 """POST /api/v1/ingest — Store a memory."""
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -20,10 +20,18 @@ class IngestRequest(BaseModel):
 async def ingest_memory(req: IngestRequest, request: Request):
     """Store a memory and return its metadata."""
     engine = request.app.state.ingest_engine
-    result = engine.ingest(
-        content=req.content,
-        namespace=req.namespace,
-        importance=req.importance,
-        metadata=req.metadata,
-    )
+    try:
+        result = engine.ingest(
+            content=req.content,
+            namespace=req.namespace,
+            importance=req.importance,
+            metadata=req.metadata,
+            caller="rest",
+        )
+    except ValueError as exc:
+        message = str(exc)
+        if message.startswith("secret_guard_blocked:"):
+            request.state.audit_result = "blocked"
+            raise HTTPException(status_code=400, detail=message) from exc
+        raise
     return result

@@ -6,7 +6,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from mnemlet import __version__
-from mnemlet.security.audit import AuditEvent
+from mnemlet.security.audit import AuditEvent, AuditResult
 
 
 def create_mcp_server(app_state) -> FastMCP:
@@ -29,6 +29,7 @@ def create_mcp_server(app_state) -> FastMCP:
         namespace: str | None = None,
         memory_id: str | None = None,
         details: dict[str, Any] | None = None,
+        result: AuditResult = "success",
     ) -> None:
         """Record sanitized MCP tool activity without request bodies or secrets."""
         app_state.db.record_audit(
@@ -37,6 +38,7 @@ def create_mcp_server(app_state) -> FastMCP:
                 namespace=namespace or "default",
                 caller="mcp",
                 memory_id=memory_id,
+                result=result,
                 details=details or {},
             )
         )
@@ -48,6 +50,14 @@ def create_mcp_server(app_state) -> FastMCP:
             return str(memory_id[0]) if memory_id else None
         return str(memory_id) if memory_id is not None else None
 
+    def blocked_secret_details(exc: ValueError) -> dict[str, Any] | None:
+        """Return sanitized secret guard details for blocked MCP writes."""
+        message = str(exc)
+        if not message.startswith("secret_guard_blocked: patterns="):
+            return None
+        patterns = message.rsplit("=", 1)[1]
+        return {"secret_guard_patterns": [item for item in patterns.split(",") if item]}
+
     @mcp.tool()
     async def mnemlet_ingest(
         content: str,
@@ -56,7 +66,13 @@ def create_mcp_server(app_state) -> FastMCP:
     ) -> dict:
         """Store a new memory. Returns metadata about the stored memory."""
         engine = app_state.ingest_engine
-        result = engine.ingest(content=content, namespace=namespace, importance=importance)
+        try:
+            result = engine.ingest(content=content, namespace=namespace, importance=importance, caller="mcp")
+        except ValueError as exc:
+            details = blocked_secret_details(exc)
+            if details is not None:
+                record_mcp_audit("ingest", namespace=namespace, details=details, result="blocked")
+            raise
         record_mcp_audit("ingest", namespace=namespace, memory_id=first_memory_id(result))
         return result
 
@@ -118,7 +134,13 @@ def create_mcp_server(app_state) -> FastMCP:
                 raise ValueError(f"invalid memory type: {memory_type}")
         from mnemlet.intelligence.review import ReviewService
 
-        result = ReviewService(app_state.db, app_state.ingest_engine).remember(content, namespace, importance, memory_type)
+        try:
+            result = ReviewService(app_state.db, app_state.ingest_engine).remember(content, namespace, importance, memory_type)
+        except ValueError as exc:
+            details = blocked_secret_details(exc)
+            if details is not None:
+                record_mcp_audit("ingest", namespace=namespace, details=details, result="blocked")
+            raise
         record_mcp_audit("ingest", namespace=namespace, memory_id=first_memory_id(result))
         return result
 
@@ -136,7 +158,13 @@ def create_mcp_server(app_state) -> FastMCP:
         """Replace a memory by superseding it and storing a new version."""
         from mnemlet.intelligence.review import ReviewService
 
-        result = ReviewService(app_state.db, app_state.ingest_engine).replace(memory_id, new_content, importance)
+        try:
+            result = ReviewService(app_state.db, app_state.ingest_engine).replace(memory_id, new_content, importance)
+        except ValueError as exc:
+            details = blocked_secret_details(exc)
+            if details is not None:
+                record_mcp_audit("replace", memory_id=memory_id, details=details, result="blocked")
+            raise
         record_mcp_audit("replace", namespace=result.get("namespace"), memory_id=memory_id)
         return result
 

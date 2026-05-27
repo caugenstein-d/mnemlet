@@ -5,6 +5,7 @@ import uuid
 from typing import Optional
 from mnemlet.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD, MEMORY_TYPES
 from mnemlet.intelligence.classifier import classify_memory
+from mnemlet.security.secret_guard import SecretGuard
 
 
 class IngestEngine:
@@ -26,10 +27,24 @@ class IngestEngine:
         dedup: bool = True,
         memory_type: str | None = None,
         type_source: str | None = None,
+        secret_guard_action: str = "block",
+        caller: str = "api",
+        caller_identity: str | None = None,
     ) -> dict:
         """Ingest a memory: chunk, dedup, embed, store. Return result."""
         if memory_type is not None and memory_type not in MEMORY_TYPES:
             raise ValueError(f"invalid memory type: {memory_type}")
+
+        guard_result = SecretGuard().enforce(content, secret_guard_action)  # type: ignore[arg-type]
+        if guard_result.blocked:
+            patterns = sorted({finding.pattern_type for finding in guard_result.findings})
+            raise ValueError(f"secret_guard_blocked: patterns={','.join(patterns)}")
+        if not guard_result.clean and guard_result.action == "warn":
+            metadata = dict(metadata or {})
+            metadata["secret_guard_result"] = "warning"
+            metadata["secret_guard_patterns"] = sorted(
+                {finding.pattern_type for finding in guard_result.findings}
+            )
 
         chunks = self._chunk(content)
 

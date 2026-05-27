@@ -212,7 +212,8 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         """Record one sanitized audit event per authenticated REST request."""
         response = await call_next(request)
         if request.url.path.startswith("/api/v1"):
-            _record_request_audit(request, "success", response.status_code)
+            audit_result = getattr(request.state, "audit_result", "success")
+            _record_request_audit(request, audit_result, response.status_code)
         return response
 
     # Decorator middleware executes in reverse declaration order; keep auth last

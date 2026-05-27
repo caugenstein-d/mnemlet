@@ -52,9 +52,21 @@ def _raise_not_found_on_error(result: dict) -> dict:
     return result
 
 
+def _raise_secret_guard_error(exc: ValueError, request: Request) -> None:
+    """Return a sanitized secret guard error to REST clients."""
+    message = str(exc)
+    if message.startswith("secret_guard_blocked:"):
+        request.state.audit_result = "blocked"
+        raise HTTPException(status_code=400, detail=message) from exc
+    raise exc
+
+
 @router.post("/remember")
 async def remember_memory(req: RememberRequest, request: Request) -> dict:
-    return _review_service(request).remember(req.content, req.namespace, req.importance, req.memory_type)
+    try:
+        return _review_service(request).remember(req.content, req.namespace, req.importance, req.memory_type)
+    except ValueError as exc:
+        _raise_secret_guard_error(exc, request)
 
 
 @router.post("/forget/{memory_id}")
@@ -64,7 +76,10 @@ async def forget_memory(memory_id: str, request: Request) -> dict:
 
 @router.post("/replace/{memory_id}")
 async def replace_memory(memory_id: str, req: ReplaceRequest, request: Request) -> dict:
-    return _raise_not_found_on_error(_review_service(request).replace(memory_id, req.new_content, req.importance))
+    try:
+        return _raise_not_found_on_error(_review_service(request).replace(memory_id, req.new_content, req.importance))
+    except ValueError as exc:
+        _raise_secret_guard_error(exc, request)
 
 
 @router.post("/confirm/{memory_id}")
