@@ -18,9 +18,11 @@ class MnemletConfig:
         vault_path: Optional[Path] = None,
         embedding_model: str = "all-MiniLM-L6-v2",
         embedding_cache_dir: Optional[Path] = None,
-    ):
+        api_key: Optional[str] = None,
+    ) -> None:
         self.server_host = os.environ.get("MNEMLET_HOST", server_host)
         self.server_port = int(os.environ.get("MNEMLET_PORT", server_port))
+        self.api_key = os.environ.get("MNEMLET_API_KEY", api_key)
 
         env_data_dir = os.environ.get("MNEMLET_DATA_DIR")
         if env_data_dir:
@@ -44,6 +46,7 @@ class MnemletConfig:
         server = data.get("server", {})
         storage = data.get("storage", {})
         embedding = data.get("embedding", {})
+        auth = data.get("auth", {})
 
         return cls(
             server_host=server.get("host", "127.0.0.1"),
@@ -54,6 +57,7 @@ class MnemletConfig:
             vault_path=Path(storage["vault_path"]).expanduser() if storage.get("vault_path") else None,
             embedding_model=embedding.get("model", "all-MiniLM-L6-v2"),
             embedding_cache_dir=Path(embedding["cache_dir"]).expanduser() if embedding.get("cache_dir") else None,
+            api_key=auth.get("api_key"),
         )
 
 

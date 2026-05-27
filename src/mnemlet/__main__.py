@@ -8,7 +8,7 @@ from mnemlet import __version__
 from mnemlet.config import MnemletConfig
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(prog="mnemlet", description="Mnemlet Memory Engine")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
@@ -28,6 +28,10 @@ def main():
             _add_retrieval_benchmark_args(mode_parser)
         if mode == "full":
             _add_live_benchmark_args(mode_parser)
+
+    auth_parser = subparsers.add_parser("auth", help="Manage auth utilities")
+    auth_subparsers = auth_parser.add_subparsers(dest="auth_command", help="Auth commands")
+    auth_subparsers.add_parser("generate-key", help="Generate a new API key")
 
     args = parser.parse_args()
 
@@ -105,6 +109,14 @@ def main():
             print(f"Benchmark complete: {result['query_count']} queries")
         for report_format, path in paths.items():
             print(f"{report_format}: {path}")
+    elif args.command == "auth":
+        if args.auth_command == "generate-key":
+            from mnemlet.security.auth import new_api_key
+
+            print(new_api_key())
+        else:
+            auth_parser.print_help()
+            sys.exit(1)
     else:
         parser.print_help()
         sys.exit(1)
