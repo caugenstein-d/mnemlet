@@ -13,6 +13,7 @@ def test_readme_mentions_v0_3_auth_and_secret_guard() -> None:
     assert "Secret Guard" in text
     assert "Audit" in text
     assert "There is no authentication layer yet" not in text
+    assert "PyPI release follows once the Trust/Security/Privacy layer lands in v0.3." not in text
 
 
 def test_security_md_matches_v0_3_behavior() -> None:

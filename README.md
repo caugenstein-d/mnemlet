@@ -72,7 +72,7 @@ If your priority is **local-first, brain-inspired forgetting, sleep consolidatio
 pip install git+https://github.com/christoph/mnemlet.git@v0.2.0
 ```
 
-> PyPI release follows once the Trust/Security/Privacy layer lands in v0.3.
+> PyPI release follows after final v0.3 release approval.
 
 ### Start the server
 
