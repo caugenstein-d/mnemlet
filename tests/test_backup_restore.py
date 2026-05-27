@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 import mnemlet.backup.backup as backup_module
+import mnemlet.backup.restore as restore_module
 from mnemlet.backup.backup import create_backup
 from mnemlet.backup.restore import restore_backup
 from mnemlet.config import MnemletConfig
@@ -231,3 +232,62 @@ def test_cli_backup_prints_archive_under_requested_output(tmp_path: Path) -> Non
     assert printed_path.suffixes[-2:] == [".tar", ".gz"]
     assert printed_path.parent == output_dir
     assert printed_path.exists()
+
+
+def test_cli_backup_from_empty_data_dir_includes_restorable_db(tmp_path: Path) -> None:
+    output_dir = tmp_path / "backups"
+    env = {**os.environ, "MNEMLET_DATA_DIR": str(tmp_path / "data")}
+
+    result = subprocess.run(
+        [".venv/bin/mnemlet", "backup", "--output", str(output_dir)],
+        check=True,
+        cwd=Path(__file__).parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    backup_path = Path(result.stdout.strip().removeprefix("Backup created: "))
+    with tarfile.open(backup_path, "r:gz") as tar:
+        assert "mnemlet.db" in tar.getnames()
+
+    restore_config = _config(tmp_path / "restore-target")
+    restore_backup(restore_config, backup_path, confirm=True)
+    restored_db = MnemletDB(restore_config.sqlite_path)
+    try:
+        assert "memories" in restored_db._list_tables()
+    finally:
+        restored_db.close()
+
+
+def test_restore_rolls_back_directory_when_install_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_config = _config(tmp_path / "source")
+    target_config = _config(tmp_path / "target")
+    source_db = MnemletDB(source_config.sqlite_path)
+    source_db.insert_memory(namespace="preferences", content_preview="source")
+    source_db.close()
+    (source_config.vault_path / "preferences").mkdir(parents=True)
+    (source_config.vault_path / "preferences" / "new.md").write_text("new")
+    backup_path = create_backup(source_config, output_dir=tmp_path / "backups")
+    target_db = MnemletDB(target_config.sqlite_path)
+    target_db.insert_memory(namespace="preferences", content_preview="target")
+    target_db.close()
+    target_config.vault_path.mkdir(parents=True)
+    keep_file = target_config.vault_path / "keep.md"
+    keep_file.write_text("keep")
+
+    original_install = restore_module._install_staged_path
+
+    def fail_install(staged: Path, destination: Path) -> None:
+        if destination == target_config.vault_path:
+            raise OSError("simulated install failure")
+        original_install(staged, destination)
+
+    monkeypatch.setattr(restore_module, "_install_staged_path", fail_install)
+
+    with pytest.raises(OSError, match="simulated install failure"):
+        restore_backup(target_config, backup_path, confirm=True)
+
+    assert keep_file.read_text() == "keep"

@@ -8,10 +8,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from mnemlet.config import MnemletConfig
+from mnemlet.storage.sqlite import MnemletDB
 
 
 def create_backup(config: MnemletConfig, output_dir: Path | None = None) -> Path:
     """Create a timestamped tar.gz backup for the configured local data."""
+    _ensure_sqlite_db(config.sqlite_path)
     destination = output_dir or config.data_dir / "backups"
     destination.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -37,6 +39,14 @@ def create_backup(config: MnemletConfig, output_dir: Path | None = None) -> Path
             tar.addfile(info, io.BytesIO(config_text))
 
     return backup_path
+
+
+def _ensure_sqlite_db(sqlite_path: Path) -> None:
+    """Create an empty SQLite database when backing up a fresh data directory."""
+    if sqlite_path.exists():
+        return
+    db = MnemletDB(sqlite_path)
+    db.close()
 
 
 def _open_unique_backup(destination: Path, timestamp: str) -> tuple[Path, io.BufferedWriter]:

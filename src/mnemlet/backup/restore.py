@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import tarfile
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -26,26 +28,29 @@ def restore_backup(config: MnemletConfig, backup_path: Path, confirm: bool = Fal
             tar.extractall(temp_dir, filter="data")
 
         _validate_extracted_backup(temp_dir)
-        staged_vault = _stage_directory(temp_dir / "vault", temp_dir / "staged-vault")
-        staged_chroma = _stage_directory(temp_dir / "chroma", temp_dir / "staged-chroma")
+        replacements = _stage_replacements(config, temp_dir)
         pre_restore_backup = create_backup(config, output_dir=config.data_dir.parent / "pre-restore-backups")
-
-        _replace_file(temp_dir / "mnemlet.db", config.sqlite_path)
-        for suffix in ("-wal", "-shm"):
-            source = temp_dir / f"mnemlet.db{suffix}"
-            target = Path(f"{config.sqlite_path}{suffix}")
-            if source.exists():
-                _replace_file(source, target)
-            elif target.exists():
-                target.unlink()
-        _replace_with_staged_directory(staged_vault, config.vault_path)
-        _replace_with_staged_directory(staged_chroma, config.chroma_path)
+        _apply_replacements(replacements)
 
     return {
         "restored_from": str(backup_path),
         "pre_restore_backup": str(pre_restore_backup),
         "data_dir": str(config.data_dir),
     }
+
+
+def _stage_replacements(config: MnemletConfig, temp_dir: Path) -> list[tuple[Path, Path | None]]:
+    """Stage all restore targets on their target filesystems before mutation."""
+    replacements: list[tuple[Path, Path | None]] = [
+        (config.sqlite_path, _stage_file(temp_dir / "mnemlet.db", config.sqlite_path)),
+    ]
+    for suffix in ("-wal", "-shm"):
+        source = temp_dir / f"mnemlet.db{suffix}"
+        target = Path(f"{config.sqlite_path}{suffix}")
+        replacements.append((target, _stage_file(source, target) if source.exists() else None))
+    replacements.append((config.vault_path, _stage_directory(temp_dir / "vault", config.vault_path)))
+    replacements.append((config.chroma_path, _stage_directory(temp_dir / "chroma", config.chroma_path)))
+    return replacements
 
 
 def _validate_extracted_backup(temp_dir: Path) -> None:
@@ -80,28 +85,74 @@ def _target_has_data(config: MnemletConfig) -> bool:
     return False
 
 
-def _replace_file(source: Path, target: Path) -> None:
-    """Replace a target file with a restored source file if present."""
-    if not source.exists():
-        if target.exists():
-            target.unlink()
-        return
+def _stage_file(source: Path, target: Path) -> Path:
+    """Copy a restored file into a target-local staging file."""
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, target)
+    handle, staging_name = tempfile.mkstemp(prefix=f".{target.name}.restore-", dir=target.parent)
+    os.close(handle)
+    staging_path = Path(staging_name)
+    shutil.copy2(source, staging_path)
+    return staging_path
 
 
-def _stage_directory(source: Path, staging_path: Path) -> Path | None:
-    """Copy a restored directory into staging before target replacement."""
+def _stage_directory(source: Path, target: Path) -> Path | None:
+    """Copy a restored directory into a target-local staging directory."""
     if not source.exists():
         return None
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging_path = Path(tempfile.mkdtemp(prefix=f".{target.name}.restore-", dir=target.parent))
+    staging_path.rmdir()
     shutil.copytree(source, staging_path)
     return staging_path
 
 
-def _replace_with_staged_directory(staged: Path | None, target: Path) -> None:
-    """Replace a target directory with a validated staged directory."""
-    if target.exists():
-        shutil.rmtree(target)
-    if staged is not None:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(staged), target)
+def _apply_replacements(replacements: list[tuple[Path, Path | None]]) -> None:
+    """Install staged restore targets and roll back moved-aside originals on failure."""
+    moved: list[tuple[Path, Path]] = []
+    installed: list[Path] = []
+    try:
+        for target, staged in replacements:
+            moved_aside = _move_existing_aside(target)
+            if moved_aside is not None:
+                moved.append((target, moved_aside))
+            if staged is not None:
+                _install_staged_path(staged, target)
+                installed.append(target)
+    except Exception:
+        _rollback_replacements(moved, installed)
+        raise
+    for _target, moved_aside in moved:
+        _remove_path(moved_aside)
+
+
+def _move_existing_aside(target: Path) -> Path | None:
+    """Move an existing restore target to a unique sibling path."""
+    if not target.exists():
+        return None
+    moved_aside = target.parent / f".{target.name}.restore-old-{uuid.uuid4().hex}"
+    target.rename(moved_aside)
+    return moved_aside
+
+
+def _install_staged_path(staged: Path, target: Path) -> None:
+    """Install a staged file or directory at its live target path."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    os.replace(staged, target)
+
+
+def _rollback_replacements(moved: list[tuple[Path, Path]], installed: list[Path]) -> None:
+    """Restore moved-aside targets after a failed restore installation."""
+    for target in reversed(installed):
+        _remove_path(target)
+    for target, moved_aside in reversed(moved):
+        if target.exists():
+            _remove_path(target)
+        moved_aside.rename(target)
+
+
+def _remove_path(path: Path) -> None:
+    """Remove a file or directory restore artifact."""
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
