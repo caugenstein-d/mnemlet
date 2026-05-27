@@ -5,6 +5,8 @@ import uuid
 from typing import Optional
 from mnemlet.constants import MAX_CHUNK_TOKENS, DEDUP_THRESHOLD, MEMORY_TYPES
 from mnemlet.intelligence.classifier import classify_memory
+from mnemlet.security.audit import AuditEvent
+from mnemlet.security.namespace_policies import policy_value_bool
 from mnemlet.security.secret_guard import SecretGuard
 
 
@@ -35,6 +37,8 @@ class IngestEngine:
         if memory_type is not None and memory_type not in MEMORY_TYPES:
             raise ValueError(f"invalid memory type: {memory_type}")
 
+        allow_ingest = policy_value_bool(self.db.get_namespace_policy(namespace, "allow_ingest"))
+        secret_guard_action = self.db.get_namespace_policy(namespace, "secret_guard_action")
         guard_result = SecretGuard().enforce(content, secret_guard_action)  # type: ignore[arg-type]
         if guard_result.blocked:
             patterns = sorted({finding.pattern_type for finding in guard_result.findings})
@@ -51,6 +55,29 @@ class IngestEngine:
             secret_guard_result = "warning"
         else:
             secret_guard_result = "clean"
+
+        if not allow_ingest:
+            self.db.record_audit(
+                AuditEvent(
+                    action="ingest",
+                    namespace=namespace,
+                    caller=caller,
+                    caller_identity=caller_identity,
+                    result="warning",
+                    details={"policy": "allow_ingest"},
+                )
+            )
+        elif secret_guard_result == "warning":
+            self.db.record_audit(
+                AuditEvent(
+                    action="ingest",
+                    namespace=namespace,
+                    caller=caller,
+                    caller_identity=caller_identity,
+                    result="warning",
+                    details={"policy": "secret_guard_action"},
+                )
+            )
 
         chunks = self._chunk(content)
 

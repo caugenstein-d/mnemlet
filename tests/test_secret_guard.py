@@ -78,6 +78,18 @@ async def test_ingest_blocks_secret_by_default() -> None:
 
 
 @pytest.mark.asyncio
+async def test_namespace_policy_can_warn_for_secret_guard() -> None:
+    key = "sk-" + "a" * 48
+    async with _client() as client:
+        await client.put("/api/v1/namespaces/warn-secrets/policies/secret_guard_action", json={"value": "warn"})
+        response = await client.post("/api/v1/ingest", json={"content": f"token {key}", "namespace": "warn-secrets"})
+        audit = await client.get("/api/v1/audit", params={"namespace": "warn-secrets", "action": "ingest"})
+
+    assert response.status_code == 200
+    assert any(event["result"] == "warning" for event in audit.json()["events"])
+
+
+@pytest.mark.asyncio
 async def test_mcp_update_blocks_secret_content_without_storing_key_material() -> None:
     key = "sk-" + "a" * 48
     async with _client() as client:

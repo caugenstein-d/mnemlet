@@ -63,6 +63,27 @@ class DecayConfigRequest(BaseModel):
     hard_delete_age_days: int = Field(default=90, ge=1)
 
 
+class NamespacePolicyRequest(BaseModel):
+    value: str = Field(..., min_length=1, max_length=1000)
+
+
+@router.get("/namespaces/{namespace}/policies")
+async def get_namespace_policies(namespace: str, request: Request) -> dict[str, object]:
+    """Get effective namespace policies."""
+    return {"namespace": namespace, "policies": request.app.state.db.list_namespace_policies(namespace)}
+
+
+@router.put("/namespaces/{namespace}/policies/{policy_key}")
+async def set_namespace_policy(
+    namespace: str,
+    policy_key: str,
+    req: NamespacePolicyRequest,
+    request: Request,
+) -> dict[str, str]:
+    """Set one namespace policy."""
+    return request.app.state.db.set_namespace_policy(namespace, policy_key, req.value)
+
+
 @router.get("/namespaces/{namespace}/decay")
 async def get_decay_config(namespace: str, request: Request) -> dict[str, object]:
     """Get decay configuration for a namespace."""

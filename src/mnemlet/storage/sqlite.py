@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from mnemlet.constants import MEMORY_STATUSES, MEMORY_TYPES
 from mnemlet.security.audit import AuditEvent
+from mnemlet.security.namespace_policies import DEFAULT_POLICIES
 
 
 SCHEMA = """
@@ -72,6 +73,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
     caller_identity TEXT DEFAULT NULL,
     result TEXT NOT NULL,
     details_json TEXT DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS namespace_policies (
+    namespace TEXT NOT NULL,
+    policy_key TEXT NOT NULL,
+    policy_value TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (namespace, policy_key)
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_namespace ON memories(namespace);
@@ -378,6 +387,43 @@ class MnemletDB:
             tuple(params),
         ).fetchall()
         return [self._audit_row_to_dict(row) for row in rows]
+
+    def get_namespace_policy(self, namespace: str, key: str) -> str:
+        """Return a namespace policy value, falling back to defaults."""
+        if key not in DEFAULT_POLICIES:
+            raise ValueError(f"unknown namespace policy: {key}")
+        row = self.conn.execute(
+            "SELECT policy_value FROM namespace_policies WHERE namespace = ? AND policy_key = ?",
+            (namespace, key),
+        ).fetchone()
+        return str(row["policy_value"]) if row else DEFAULT_POLICIES[key]
+
+    def set_namespace_policy(self, namespace: str, key: str, value: str) -> dict[str, str]:
+        """Insert or update one namespace policy value."""
+        if key not in DEFAULT_POLICIES:
+            raise ValueError(f"unknown namespace policy: {key}")
+        now = datetime.now(timezone.utc).isoformat()
+        self.conn.execute(
+            """INSERT INTO namespace_policies (namespace, policy_key, policy_value, updated_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(namespace, policy_key) DO UPDATE SET
+               policy_value = excluded.policy_value,
+               updated_at = excluded.updated_at""",
+            (namespace, key, value, now),
+        )
+        self.conn.commit()
+        return {"namespace": namespace, "policy_key": key, "policy_value": value}
+
+    def list_namespace_policies(self, namespace: str) -> dict[str, str]:
+        """List effective namespace policies including defaults."""
+        policies = dict(DEFAULT_POLICIES)
+        rows = self.conn.execute(
+            "SELECT policy_key, policy_value FROM namespace_policies WHERE namespace = ?",
+            (namespace,),
+        ).fetchall()
+        for row in rows:
+            policies[str(row["policy_key"])] = str(row["policy_value"])
+        return policies
 
     def _sanitize_fts_query(self, query: str) -> str:
         """Sanitize user input for FTS5 MATCH queries.

@@ -70,8 +70,11 @@ async def remember_memory(req: RememberRequest, request: Request) -> dict:
 
 
 @router.post("/forget/{memory_id}")
-async def forget_memory(memory_id: str, request: Request) -> dict:
-    return _raise_not_found_on_error(_review_service(request).forget(memory_id))
+async def forget_memory(memory_id: str, request: Request, confirm: bool = False) -> dict:
+    result = _review_service(request).forget(memory_id, confirm=confirm)
+    if result.get("requires_confirmation") is True:
+        raise HTTPException(status_code=409, detail=result)
+    return _raise_not_found_on_error(result)
 
 
 @router.post("/replace/{memory_id}")

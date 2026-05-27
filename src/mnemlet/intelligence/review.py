@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from mnemlet.constants import BOOST_CONFIRM, MEMORY_STATUS_FORGOTTEN, MEMORY_STATUS_SUPERSEDED
+from mnemlet.security.namespace_policies import policy_value_bool
 
 
 class ReviewService:
@@ -32,11 +33,17 @@ class ReviewService:
             type_source="manual" if memory_type else None,
         )
 
-    def forget(self, memory_id: str) -> dict:
+    def forget(self, memory_id: str, confirm: bool = False) -> dict:
         """Mark a memory as forgotten without deleting it."""
-        memory = self.db.update_memory_status(memory_id, MEMORY_STATUS_FORGOTTEN)
-        if memory is None:
+        existing = self.db.get_memory(memory_id)
+        if existing is None:
             return {"error": f"Memory {memory_id} not found"}
+        requires_confirmation = policy_value_bool(
+            self.db.get_namespace_policy(existing["namespace"], "confirm_before_forget")
+        )
+        if requires_confirmation and not confirm:
+            return {"error": "confirm=true required", "requires_confirmation": True}
+        memory = self.db.update_memory_status(memory_id, MEMORY_STATUS_FORGOTTEN)
         self.db.record_interaction(memory_id, "forget", agent_id="api")
         return self.db.get_memory(memory_id)
 
