@@ -14,28 +14,41 @@ def create_backup(config: MnemletConfig, output_dir: Path | None = None) -> Path
     """Create a timestamped tar.gz backup for the configured local data."""
     destination = output_dir or config.data_dir / "backups"
     destination.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    backup_path = destination / f"mnemlet-backup-{timestamp}.tar.gz"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    backup_path, backup_file = _open_unique_backup(destination, timestamp)
 
-    with tarfile.open(backup_path, "w:gz") as tar:
-        if config.sqlite_path.exists():
-            tar.add(config.sqlite_path, arcname="mnemlet.db")
-        for suffix in ("-wal", "-shm"):
-            sidecar = Path(f"{config.sqlite_path}{suffix}")
-            if sidecar.exists():
-                tar.add(sidecar, arcname=f"mnemlet.db{suffix}")
-        if config.vault_path.exists():
-            tar.add(config.vault_path, arcname="vault")
-        if config.chroma_path.exists():
-            tar.add(config.chroma_path, arcname="chroma")
+    with backup_file:
+        with tarfile.open(fileobj=backup_file, mode="w:gz") as tar:
+            if config.sqlite_path.exists():
+                tar.add(config.sqlite_path, arcname="mnemlet.db")
+            for suffix in ("-wal", "-shm"):
+                sidecar = Path(f"{config.sqlite_path}{suffix}")
+                if sidecar.exists():
+                    tar.add(sidecar, arcname=f"mnemlet.db{suffix}")
+            if config.vault_path.exists():
+                tar.add(config.vault_path, arcname="vault")
+            if config.chroma_path.exists():
+                tar.add(config.chroma_path, arcname="chroma")
 
-        config_text = _redacted_config(config).encode("utf-8")
-        info = tarfile.TarInfo("config.toml")
-        info.size = len(config_text)
-        info.mtime = int(datetime.now(timezone.utc).timestamp())
-        tar.addfile(info, io.BytesIO(config_text))
+            config_text = _redacted_config(config).encode("utf-8")
+            info = tarfile.TarInfo("config.toml")
+            info.size = len(config_text)
+            info.mtime = int(datetime.now(timezone.utc).timestamp())
+            tar.addfile(info, io.BytesIO(config_text))
 
     return backup_path
+
+
+def _open_unique_backup(destination: Path, timestamp: str) -> tuple[Path, io.BufferedWriter]:
+    """Open a collision-resistant backup path without overwriting an existing archive."""
+    for attempt in range(100):
+        suffix = "" if attempt == 0 else f"-{attempt}"
+        backup_path = destination / f"mnemlet-backup-{timestamp}{suffix}.tar.gz"
+        try:
+            return backup_path, backup_path.open("xb")
+        except FileExistsError:
+            continue
+    raise RuntimeError("Unable to create a unique backup archive path")
 
 
 def _redacted_config(config: MnemletConfig) -> str:

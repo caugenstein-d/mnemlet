@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import io
+import os
+import subprocess
 import tarfile
+from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
+import mnemlet.backup.backup as backup_module
 from mnemlet.backup.backup import create_backup
 from mnemlet.backup.restore import restore_backup
 from mnemlet.config import MnemletConfig
@@ -65,3 +72,162 @@ def test_restore_replaces_data_and_creates_pre_restore_backup(tmp_path: Path) ->
         restored_db.close()
     assert restored is not None
     assert Path(result["pre_restore_backup"]).exists()
+
+
+def test_restore_rejects_archive_without_db_and_preserves_current_db(tmp_path: Path) -> None:
+    target_config = _config(tmp_path / "target")
+    target_db = MnemletDB(target_config.sqlite_path)
+    current = target_db.insert_memory(namespace="preferences", content_preview="current")
+    target_db.close()
+    backup_path = tmp_path / "missing-db.tar.gz"
+    with tarfile.open(backup_path, "w:gz") as tar:
+        config_text = b"[auth]\napi_key = \"<redacted>\"\n"
+        info = tarfile.TarInfo("config.toml")
+        info.size = len(config_text)
+        tar.addfile(info, fileobj=io.BytesIO(config_text))
+
+    with pytest.raises(ValueError, match="mnemlet.db"):
+        restore_backup(target_config, backup_path, confirm=True)
+
+    restored_db = MnemletDB(target_config.sqlite_path)
+    try:
+        assert restored_db.get_memory(current["id"]) is not None
+    finally:
+        restored_db.close()
+
+
+def test_restore_rejects_file_vault_and_preserves_current_vault(tmp_path: Path) -> None:
+    source_config = _config(tmp_path / "source")
+    target_config = _config(tmp_path / "target")
+    source_db = MnemletDB(source_config.sqlite_path)
+    source_db.insert_memory(namespace="preferences", content_preview="source")
+    source_db.close()
+    target_config.vault_path.mkdir(parents=True)
+    existing_file = target_config.vault_path / "existing.md"
+    existing_file.write_text("keep me")
+    backup_path = tmp_path / "file-vault.tar.gz"
+
+    with tarfile.open(backup_path, "w:gz") as tar:
+        tar.add(source_config.sqlite_path, arcname="mnemlet.db")
+        vault_content = b"not a directory"
+        info = tarfile.TarInfo("vault")
+        info.size = len(vault_content)
+        tar.addfile(info, fileobj=io.BytesIO(vault_content))
+
+    with pytest.raises(ValueError, match="vault"):
+        restore_backup(target_config, backup_path, confirm=True)
+
+    assert existing_file.read_text() == "keep me"
+
+
+def test_backup_paths_are_unique_within_same_second(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = _config(tmp_path / "data")
+    db = MnemletDB(config.sqlite_path)
+    db.insert_memory(namespace="preferences", content_preview="dark mode")
+    db.close()
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz: timezone | None = None) -> datetime:
+            return cls(2026, 5, 27, 14, 0, 0, tzinfo=tz)
+
+    monkeypatch.setattr(backup_module, "datetime", FixedDatetime)
+
+    first = create_backup(config, output_dir=tmp_path / "backups")
+    second = create_backup(config, output_dir=tmp_path / "backups")
+
+    assert first != second
+    assert first.exists()
+    assert second.exists()
+
+
+def test_restore_refuses_non_empty_target_without_confirm_and_preserves_db(tmp_path: Path) -> None:
+    source_config = _config(tmp_path / "source")
+    target_config = _config(tmp_path / "target")
+    source_db = MnemletDB(source_config.sqlite_path)
+    source_db.insert_memory(namespace="preferences", content_preview="source")
+    source_db.close()
+    backup_path = create_backup(source_config, output_dir=tmp_path / "backups")
+    target_db = MnemletDB(target_config.sqlite_path)
+    current = target_db.insert_memory(namespace="preferences", content_preview="current")
+    target_db.close()
+
+    with pytest.raises(RuntimeError, match="non-empty"):
+        restore_backup(target_config, backup_path)
+
+    preserved_db = MnemletDB(target_config.sqlite_path)
+    try:
+        assert preserved_db.get_memory(current["id"]) is not None
+    finally:
+        preserved_db.close()
+
+
+def test_backup_and_restore_sidecar_files(tmp_path: Path) -> None:
+    source_config = _config(tmp_path / "source")
+    target_config = _config(tmp_path / "target")
+    source_db = MnemletDB(source_config.sqlite_path)
+    source_db.insert_memory(namespace="preferences", content_preview="source")
+    source_db.close()
+    source_wal = Path(f"{source_config.sqlite_path}-wal")
+    source_shm = Path(f"{source_config.sqlite_path}-shm")
+    source_wal.write_text("source wal")
+    source_shm.write_text("source shm")
+    target_db = MnemletDB(target_config.sqlite_path)
+    target_db.insert_memory(namespace="preferences", content_preview="target")
+    target_db.close()
+    target_wal = Path(f"{target_config.sqlite_path}-wal")
+    target_shm = Path(f"{target_config.sqlite_path}-shm")
+    target_wal.write_text("target wal")
+    target_shm.write_text("target shm")
+
+    backup_path = create_backup(source_config, output_dir=tmp_path / "backups")
+
+    with tarfile.open(backup_path, "r:gz") as tar:
+        names = tar.getnames()
+    assert "mnemlet.db-wal" in names
+    assert "mnemlet.db-shm" in names
+
+    restore_backup(target_config, backup_path, confirm=True)
+
+    assert target_wal.read_text() == "source wal"
+    assert target_shm.read_text() == "source shm"
+
+
+def test_restore_removes_stale_sidecars_absent_from_backup(tmp_path: Path) -> None:
+    source_config = _config(tmp_path / "source")
+    target_config = _config(tmp_path / "target")
+    source_db = MnemletDB(source_config.sqlite_path)
+    source_db.insert_memory(namespace="preferences", content_preview="source")
+    source_db.close()
+    target_db = MnemletDB(target_config.sqlite_path)
+    target_db.insert_memory(namespace="preferences", content_preview="target")
+    target_db.close()
+    target_wal = Path(f"{target_config.sqlite_path}-wal")
+    target_shm = Path(f"{target_config.sqlite_path}-shm")
+    target_wal.write_text("stale wal")
+    target_shm.write_text("stale shm")
+    backup_path = create_backup(source_config, output_dir=tmp_path / "backups")
+
+    restore_backup(target_config, backup_path, confirm=True)
+
+    assert not target_wal.exists()
+    assert not target_shm.exists()
+
+
+def test_cli_backup_prints_archive_under_requested_output(tmp_path: Path) -> None:
+    output_dir = tmp_path / "backups"
+    env = {**os.environ, "MNEMLET_DATA_DIR": str(tmp_path / "data")}
+
+    result = subprocess.run(
+        [".venv/bin/mnemlet", "backup", "--output", str(output_dir)],
+        check=True,
+        cwd=Path(__file__).parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    printed_path = Path(result.stdout.strip().removeprefix("Backup created: "))
+    assert printed_path.suffixes[-2:] == [".tar", ".gz"]
+    assert printed_path.parent == output_dir
+    assert printed_path.exists()
