@@ -19,10 +19,12 @@ class MnemletConfig:
         embedding_model: str = "all-MiniLM-L6-v2",
         embedding_cache_dir: Optional[Path] = None,
         api_key: Optional[str] = None,
+        cors_origins: Optional[list[str]] = None,
     ) -> None:
         self.server_host = os.environ.get("MNEMLET_HOST", server_host)
         self.server_port = int(os.environ.get("MNEMLET_PORT", server_port))
         self.api_key = os.environ.get("MNEMLET_API_KEY", api_key)
+        self.cors_origins = cors_origins or ["http://localhost", "http://127.0.0.1"]
 
         env_data_dir = os.environ.get("MNEMLET_DATA_DIR")
         if env_data_dir:
@@ -58,6 +60,7 @@ class MnemletConfig:
             embedding_model=embedding.get("model", "all-MiniLM-L6-v2"),
             embedding_cache_dir=Path(embedding["cache_dir"]).expanduser() if embedding.get("cache_dir") else None,
             api_key=auth.get("api_key"),
+            cors_origins=server.get("cors_origins"),
         )
 
 

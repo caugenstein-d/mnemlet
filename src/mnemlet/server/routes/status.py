@@ -1,22 +1,25 @@
 """GET /api/v1/status and /api/v1/health — System status."""
 
+from typing import Any
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from mnemlet import __version__
+from mnemlet.security.auth import key_configured
 
 
 router = APIRouter(prefix="/api/v1", tags=["status"])
 
 
 @router.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok"}
 
 
 @router.get("/status")
-async def status(request: Request):
+async def status(request: Request) -> dict[str, Any]:
     """System status with memory counts."""
     db = request.app.state.db
     chroma = request.app.state.chroma
@@ -38,11 +41,15 @@ async def status(request: Request):
         "total_interactions": interactions,
         "chroma_documents": chroma_count,
         "version": __version__,
+        "security": {
+            "auth_configured": key_configured(getattr(request.app.state.config, "api_key", None)),
+            "warnings": [w.to_dict() for w in getattr(request.app.state, "security_warnings", [])],
+        },
     }
 
 
 @router.get("/vault")
-async def vault_info(request: Request):
+async def vault_info(request: Request) -> dict[str, object]:
     """Get vault path and file count."""
     vault = request.app.state.vault
     count = sum(1 for _ in vault.vault_path.rglob("*.md"))
@@ -57,7 +64,7 @@ class DecayConfigRequest(BaseModel):
 
 
 @router.get("/namespaces/{namespace}/decay")
-async def get_decay_config(namespace: str, request: Request):
+async def get_decay_config(namespace: str, request: Request) -> dict[str, object]:
     """Get decay configuration for a namespace."""
     config = request.app.state.db.get_decay_config(namespace)
     if config is None:
@@ -70,7 +77,7 @@ async def get_decay_config(namespace: str, request: Request):
 
 
 @router.put("/namespaces/{namespace}/decay")
-async def set_decay_config(namespace: str, req: DecayConfigRequest, request: Request):
+async def set_decay_config(namespace: str, req: DecayConfigRequest, request: Request) -> dict[str, object]:
     """Set decay configuration for a namespace."""
     config = request.app.state.db.set_decay_config(
         namespace=namespace,

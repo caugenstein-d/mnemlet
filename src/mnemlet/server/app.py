@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from mnemlet import __version__
 from mnemlet.config import MnemletConfig
+from mnemlet.security.startup_check import run_startup_security_checks
 from mnemlet.storage.sqlite import MnemletDB
 from mnemlet.storage.chroma import MnemletChroma
 from mnemlet.storage.embeddings import MnemletEmbedding
@@ -35,6 +36,8 @@ def _get_mcp_session_manager(mcp_app: Any) -> Any:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup and shutdown lifecycle."""
     config = app.state.config
+    for warning in getattr(app.state, "security_warnings", []):
+        print(f"[security] {warning.level}: {warning.message}")
     app.state.db = MnemletDB(config.sqlite_path)
     app.state.embedder = MnemletEmbedding(cache_dir=config.embedding_cache_dir)
     app.state.chroma = MnemletChroma(config.chroma_path, app.state.embedder)
@@ -113,6 +116,7 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.config = config
+    app.state.security_warnings = run_startup_security_checks(config)
     mcp = create_mcp_server(app.state)
     mcp_app = mcp.streamable_http_app()
     app.state.mcp_app = mcp_app
@@ -121,7 +125,7 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=config.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
