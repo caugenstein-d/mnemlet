@@ -97,6 +97,36 @@ def test_restore_rejects_archive_without_db_and_preserves_current_db(tmp_path: P
         restored_db.close()
 
 
+def test_restore_rejects_malformed_sqlite_db_and_preserves_current_data(tmp_path: Path) -> None:
+    target_config = _config(tmp_path / "target")
+    target_db = MnemletDB(target_config.sqlite_path)
+    current = target_db.insert_memory(namespace="preferences", content_preview="current")
+    target_db.close()
+    target_config.vault_path.mkdir(parents=True)
+    keep_file = target_config.vault_path / "keep.md"
+    keep_file.write_text("keep")
+    backup_path = tmp_path / "malformed-db.tar.gz"
+    with tarfile.open(backup_path, "w:gz") as tar:
+        bad_db = b"not a sqlite database"
+        info = tarfile.TarInfo("mnemlet.db")
+        info.size = len(bad_db)
+        tar.addfile(info, fileobj=io.BytesIO(bad_db))
+        config_text = b"[auth]\napi_key = \"<redacted>\"\n"
+        config_info = tarfile.TarInfo("config.toml")
+        config_info.size = len(config_text)
+        tar.addfile(config_info, fileobj=io.BytesIO(config_text))
+
+    with pytest.raises(ValueError, match="SQLite"):
+        restore_backup(target_config, backup_path, confirm=True)
+
+    preserved_db = MnemletDB(target_config.sqlite_path)
+    try:
+        assert preserved_db.get_memory(current["id"]) is not None
+    finally:
+        preserved_db.close()
+    assert keep_file.read_text() == "keep"
+
+
 def test_restore_rejects_file_vault_and_preserves_current_vault(tmp_path: Path) -> None:
     source_config = _config(tmp_path / "source")
     target_config = _config(tmp_path / "target")

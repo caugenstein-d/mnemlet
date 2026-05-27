@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 import tarfile
 import tempfile
 import uuid
@@ -58,6 +59,7 @@ def _validate_extracted_backup(temp_dir: Path) -> None:
     db_path = temp_dir / "mnemlet.db"
     if not db_path.is_file():
         raise ValueError("Backup archive must contain mnemlet.db as a regular file")
+    _validate_sqlite_database(db_path)
     for name in ("mnemlet.db-wal", "mnemlet.db-shm"):
         sidecar = temp_dir / name
         if sidecar.exists() and not sidecar.is_file():
@@ -66,6 +68,25 @@ def _validate_extracted_backup(temp_dir: Path) -> None:
         directory = temp_dir / name
         if directory.exists() and not directory.is_dir():
             raise ValueError(f"Backup archive entry {name} must be a directory")
+
+
+def _validate_sqlite_database(db_path: Path) -> None:
+    """Validate that an extracted backup DB is a readable Mnémlet SQLite database."""
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True)
+        try:
+            integrity = conn.execute("PRAGMA integrity_check").fetchone()
+            if integrity is None or integrity[0] != "ok":
+                raise ValueError("Backup mnemlet.db failed SQLite integrity_check")
+            row = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'memories'"
+            ).fetchone()
+            if row is None:
+                raise ValueError("Backup mnemlet.db is missing required memories table")
+        finally:
+            conn.close()
+    except sqlite3.DatabaseError as exc:
+        raise ValueError("Backup mnemlet.db is not a valid SQLite database") from exc
 
 
 def _target_has_data(config: MnemletConfig) -> bool:
