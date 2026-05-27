@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import sqlite3
 import subprocess
 import tarfile
 from datetime import datetime, timezone
@@ -125,6 +126,35 @@ def test_restore_rejects_malformed_sqlite_db_and_preserves_current_data(tmp_path
     finally:
         preserved_db.close()
     assert keep_file.read_text() == "keep"
+
+
+def test_restore_validates_sqlite_with_wal_sidecar(tmp_path: Path) -> None:
+    source_db_path = tmp_path / "wal-source" / "mnemlet.db"
+    source_db_path.parent.mkdir()
+    conn = sqlite3.connect(source_db_path)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA wal_autocheckpoint=0")
+        conn.execute("CREATE TABLE memories (id TEXT PRIMARY KEY, content_preview TEXT NOT NULL)")
+        conn.execute("INSERT INTO memories (id, content_preview) VALUES ('wal-only', 'from wal')")
+        conn.commit()
+        backup_path = tmp_path / "wal-backup.tar.gz"
+        with tarfile.open(backup_path, "w:gz") as tar:
+            tar.add(source_db_path, arcname="mnemlet.db")
+            tar.add(Path(f"{source_db_path}-wal"), arcname="mnemlet.db-wal")
+            tar.add(Path(f"{source_db_path}-shm"), arcname="mnemlet.db-shm")
+    finally:
+        conn.close()
+
+    target_config = _config(tmp_path / "target")
+    restore_backup(target_config, backup_path, confirm=True)
+
+    restored = sqlite3.connect(target_config.sqlite_path)
+    try:
+        row = restored.execute("SELECT content_preview FROM memories WHERE id = 'wal-only'").fetchone()
+    finally:
+        restored.close()
+    assert row == ("from wal",)
 
 
 def test_restore_rejects_file_vault_and_preserves_current_vault(tmp_path: Path) -> None:

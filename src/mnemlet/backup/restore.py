@@ -72,9 +72,22 @@ def _validate_extracted_backup(temp_dir: Path) -> None:
 
 def _validate_sqlite_database(db_path: Path) -> None:
     """Validate that an extracted backup DB is a readable Mnémlet SQLite database."""
+    with tempfile.TemporaryDirectory(prefix="mnemlet-validate-") as temp_name:
+        validation_db_path = Path(temp_name) / "mnemlet.db"
+        shutil.copy2(db_path, validation_db_path)
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(f"{db_path}{suffix}")
+            if sidecar.exists():
+                shutil.copy2(sidecar, Path(f"{validation_db_path}{suffix}"))
+        _validate_sqlite_database_copy(validation_db_path)
+
+
+def _validate_sqlite_database_copy(db_path: Path) -> None:
+    """Validate a temporary SQLite DB copy where WAL/SHM may be updated."""
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True)
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         try:
+            conn.execute("PRAGMA query_only=ON")
             integrity = conn.execute("PRAGMA integrity_check").fetchone()
             if integrity is None or integrity[0] != "ok":
                 raise ValueError("Backup mnemlet.db failed SQLite integrity_check")
