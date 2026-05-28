@@ -100,7 +100,7 @@ echo -e "${GREEN}OK Demo server running at ${BASE}${RESET}"
 echo ""
 
 echo -e "${YELLOW}> Remembering an authenticated preference...${RESET}"
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -H 'X-Mnemlet-Key: ...' -d '{... preference ...}'${RESET}"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/remember -H 'Content-Type: application/json' -H 'X-Mnemlet-Key: ...' -d '{... preference ...}'${RESET}"
 PREF_JSON="$(curl -fsS -X POST "${BASE}/api/v1/remember" \
   "${auth_header[@]}" \
   "${json_header[@]}" \
@@ -111,7 +111,7 @@ echo ""
 
 echo -e "${YELLOW}> Secret Guard blocks a fake test key before storage...${RESET}"
 FAKE_KEY="sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/ingest -H 'X-Mnemlet-Key: ...' -d '{... fake key ...}'${RESET}"
+echo -e "${BOLD}$ curl -X POST ${BASE}/api/v1/ingest -H 'Content-Type: application/json' -H 'X-Mnemlet-Key: ...' -d '{... fake key ...}'${RESET}"
 SECRET_RESPONSE="$(curl -sS -X POST "${BASE}/api/v1/ingest" \
   "${auth_header[@]}" \
   "${json_header[@]}" \

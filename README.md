@@ -69,7 +69,7 @@ If your priority is **local-first, brain-inspired forgetting, sleep consolidatio
 ### Install
 
 ```bash
-pip install git+https://github.com/christoph/mnemlet.git@v0.2.0
+pip install git+https://github.com/christoph/mnemlet.git
 ```
 
 > PyPI release follows after final v0.3 release approval.
