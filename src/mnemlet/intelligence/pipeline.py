@@ -102,5 +102,9 @@ class ExtractionPipeline:
         self.buffer.flush_all()
 
     def stop(self):
-        """Stop the pipeline."""
+        """Stop the pipeline, flushing any remaining sessions."""
         self.buffer.stop()
+
+    def shutdown(self):
+        """Stop the pipeline without flushing (safe for server shutdown)."""
+        self.buffer.shutdown()

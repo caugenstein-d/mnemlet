@@ -117,7 +117,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         embedder=app.state.embedder,
     )
 
-    # Create sleep engine
+    # Optional LLM backend (off by default). Construction is lazy and makes no
+    # network calls, so this is safe even when Ollama is unreachable.
+    app.state.llm = None
+    app.state.extraction_pipeline = None
+    if getattr(config, "llm_enabled", False):
+        from mnemlet.engine.llm import LLMBackend
+
+        app.state.llm = LLMBackend(base_url=config.llm_base_url, model=config.llm_model)
+
+        # v0.4 intelligent extraction pipeline (requires the LLM backend).
+        if getattr(config, "extraction_enabled", False):
+            from mnemlet.intelligence.pipeline import ExtractionPipeline
+
+            app.state.extraction_pipeline = ExtractionPipeline(
+                ingest_engine=app.state.ingest_engine,
+                llm_client=app.state.llm,
+                extract_memories=config.extract_memories,
+                summarize_conversations=config.summarize_conversations,
+                inactivity_threshold_minutes=config.inactivity_threshold_minutes,
+                max_messages=config.max_buffer_messages,
+            )
+
+    # Create sleep engine (LLM, when present, powers richer morning briefings)
     decay_engine = DecayEngine(app.state.db)
     app.state.sleep_engine = SleepEngine(
         db=app.state.db,
@@ -125,6 +147,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         embedder=app.state.embedder,
         vault=app.state.vault,
         decay_engine=decay_engine,
+        llm=app.state.llm,
     )
 
     async def decay_loop() -> None:
@@ -165,6 +188,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await sleep_task
             except asyncio.CancelledError:
                 pass
+            # Tear down the extraction pipeline without flushing (a slow LLM
+            # flush must not block shutdown) and close the LLM HTTP client.
+            pipeline = getattr(app.state, "extraction_pipeline", None)
+            if pipeline is not None:
+                pipeline.shutdown()
+            llm = getattr(app.state, "llm", None)
+            if llm is not None and hasattr(llm, "close"):
+                llm.close()
 
 
 def create_app(config: MnemletConfig | None = None) -> FastAPI:

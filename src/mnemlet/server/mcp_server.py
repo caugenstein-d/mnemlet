@@ -1,4 +1,4 @@
-"""MCP (Model Context Protocol) server for Mnemlet - 15 tools."""
+"""MCP (Model Context Protocol) server for Mnemlet - 16 tools."""
 
 import json
 from typing import Any
@@ -76,6 +76,41 @@ def create_mcp_server(app_state) -> FastMCP:
             raise
         record_mcp_audit("ingest", namespace=namespace, memory_id=first_memory_id(result))
         return result
+
+    @mcp.tool()
+    async def mnemlet_observe(
+        content: str,
+        role: str = "user",
+        session_id: str = "default",
+        namespace: str = "default",
+        platform: str = "generic",
+    ) -> dict:
+        """Record a conversation message for background memory extraction.
+
+        Unlike mnemlet_ingest (which stores content immediately and verbatim),
+        this buffers messages per session. When the session ends (inactivity,
+        size cap, or shutdown) the LLM extracts memories and a summary. Only
+        active when intelligent extraction is enabled in config; otherwise it
+        advises using mnemlet_ingest.
+        """
+        pipeline = getattr(app_state, "extraction_pipeline", None)
+        if pipeline is None:
+            return {
+                "buffered": False,
+                "note": "intelligent extraction is not enabled; use mnemlet_ingest to store directly",
+            }
+        pipeline.add_message(
+            session_key=session_id,
+            message={"role": role, "content": content},
+            platform=platform,
+            namespace=namespace,
+        )
+        record_mcp_audit(
+            "observe",
+            namespace=namespace,
+            details={"session_id": session_id, "platform": platform},
+        )
+        return {"buffered": True, "session_id": session_id, "namespace": namespace}
 
     @mcp.tool()
     async def mnemlet_recall(

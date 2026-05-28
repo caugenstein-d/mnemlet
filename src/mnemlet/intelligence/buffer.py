@@ -115,3 +115,17 @@ class ConversationBuffer:
                 self._timer.cancel()
                 self._timer = None
         self.flush_all()
+
+    def shutdown(self):
+        """Cancel the timer and drop buffered messages WITHOUT flushing.
+
+        Used on server shutdown so a slow LLM flush can't block the event
+        loop from stopping. Buffered chat fragments are transient and safe
+        to discard.
+        """
+        with self._lock:
+            if self._timer:
+                self._timer.cancel()
+                self._timer = None
+            self._buffers.clear()
+            self._last_activity.clear()

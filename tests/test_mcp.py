@@ -49,7 +49,7 @@ def test_mcp_module_documents_v0_3_audit_tool() -> None:
     """MCP module documentation advertises the v0.3 tool count after audit lands."""
     from mnemlet.server import mcp_server
 
-    assert "15 tools" in (mcp_server.__doc__ or "")
+    assert "16 tools" in (mcp_server.__doc__ or "")
 
 
 @pytest.mark.asyncio
