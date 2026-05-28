@@ -25,12 +25,14 @@ class SleepEngine:
         clock: Callable[[], float] | None = None,
         task_cooldown_seconds: float = 30,
         stop_join_timeout_seconds: float = 30.0,
+        llm: Any = None,
     ) -> None:
         self.db = db
         self.chroma = chroma
         self.embedder = embedder
         self.vault = vault
         self.decay = decay_engine
+        self.llm = llm
         self.inactivity_threshold = inactivity_threshold_seconds
         self._clock = clock or time.monotonic
         self._task_cooldown_seconds = task_cooldown_seconds
@@ -244,23 +246,65 @@ class SleepEngine:
             print(f"[sleep] Cluster: namespace '{ns}' has {count} new memories today")
 
     def _task_prepare_briefing(self) -> None:
-        """Generate a morning briefing from top-scored recent memories."""
+        """Generate an intelligent morning briefing, using the LLM when available."""
         rows = self.db.conn.execute(
-            """SELECT content_preview, namespace, retention_score
+            """SELECT content_preview, namespace, retention_score, created_at
                FROM memories WHERE status = 'active'
-               ORDER BY retention_score DESC LIMIT 10"""
+               ORDER BY retention_score DESC LIMIT 20"""
         ).fetchall()
 
         if not rows:
             return
 
+        # No LLM configured → fall back to the naive list briefing.
+        if not getattr(self, "llm", None):
+            self._task_prepare_briefing_naive(rows)
+            return
+
+        memories_text = "\n".join(
+            f"- [{r['namespace']}] {r['content_preview']}" for r in rows
+        )
+        prompt = f"""Generate a morning briefing based on these recent memories.
+
+Recent memories (ordered by importance):
+{memories_text}
+
+Create a briefing with these sections:
+1. **Current Projects**: What is actively being worked on?
+2. **Key Preferences**: What are the important preferences?
+3. **Recent Activity**: What happened in the last 24-48 hours?
+4. **Today's Focus**: What should be the focus today?
+
+Keep it concise (5-10 sentences total). Be specific and actionable.
+
+Morning Briefing:"""
+
+        try:
+            briefing_text = self.llm.generate(prompt)
+        except Exception as e:  # noqa: BLE001 - LLM is optional; degrade gracefully
+            print(f"[sleep] LLM briefing failed ({e}); using naive briefing")
+            self._task_prepare_briefing_naive(rows)
+            return
+
+        if not briefing_text or not briefing_text.strip():
+            self._task_prepare_briefing_naive(rows)
+            return
+
+        self._store_briefing(briefing_text.strip())
+        print("[sleep] Morning briefing generated (LLM)")
+
+    def _task_prepare_briefing_naive(self, rows) -> None:
+        """Fallback: naive briefing (list of top memories)."""
         lines = ["# Morning Briefing", "", f"Generated: {datetime.now(timezone.utc).isoformat()}", ""]
-        for r in rows:
-            lines.append(f"- [{r['namespace']}] (score: {r['retention_score']:.2f}) {r['content_preview'][:100]}")
+        for r in rows[:10]:
+            lines.append(
+                f"- [{r['namespace']}] (score: {r['retention_score']:.2f}) {r['content_preview'][:100]}"
+            )
+        self._store_briefing("\n".join(lines))
+        print("[sleep] Morning briefing generated (naive)")
 
-        briefing = "\n".join(lines)
-
-        # Store briefing as system memory
+    def _store_briefing(self, briefing: str) -> None:
+        """Persist a briefing as a system memory and write it to the vault."""
         now = datetime.now(timezone.utc).isoformat()
         import uuid
         bid = str(uuid.uuid4())[:8]
@@ -272,7 +316,6 @@ class SleepEngine:
         )
         self.db.conn.commit()
 
-        # Also write to vault
         if self.vault:
             self.vault.write_memory(
                 memory_id=f"briefing-{bid}",
@@ -281,5 +324,3 @@ class SleepEngine:
                 retention_score=0.9,
                 created_at=now,
             )
-
-        print("[sleep] Morning briefing generated")
