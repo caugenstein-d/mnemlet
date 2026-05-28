@@ -10,6 +10,7 @@ from mnemlet.config import MnemletConfig
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="mnemlet", description="Mnemlet Memory Engine")
+    parser.add_argument("--version", action="version", version=f"Mnemlet v{__version__}")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     serve_parser = subparsers.add_parser("serve", help="Start the Mnemlet server")
