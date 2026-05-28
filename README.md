@@ -113,6 +113,8 @@ curl -X POST http://localhost:4050/api/v1/recall \
 
 ### Python SDK
 
+Python SDK example is for localhost no-key development only. Authenticated server mode currently needs REST or MCP with `X-Mnemlet-Key`. SDK auth support has not landed yet.
+
 ```python
 from mnemlet.client import MnemletClient
 

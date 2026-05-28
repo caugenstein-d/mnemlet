@@ -189,11 +189,14 @@ body::after {
 <span class="text-text">  -d '{"content":"Christoph prefers dark mode in all editors","namespace":"preferences","memory_type":"preference"}'</span>
 <span class="text-muted/60">{"memory_id":"7f4a...","stored":true,"namespace":"preferences","superseded_ids":[]}</span>
 
-<span class="text-cta">$</span> <span class="text-text">curl -X POST http://127.0.0.1:14060/api/v1/ingest -H "X-Mnemlet-Key: $MNEMLET_API_KEY" -d '{"content":"token sk-test..."}'</span>
-<span class="text-muted/60">{"detail":{"message":"Secret Guard blocked content","findings":["openai_key"]}}</span>
+<span class="text-cta">$</span> <span class="text-text">curl -X POST http://127.0.0.1:14060/api/v1/ingest \</span>
+<span class="text-text">  -H 'Content-Type: application/json' \</span>
+<span class="text-text">  -H "X-Mnemlet-Key: $MNEMLET_API_KEY" \</span>
+<span class="text-text">  -d '{"content":"token sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'</span>
+<span class="text-muted/60">{"detail":"secret_guard_blocked: patterns=openai_key"}</span>
 
 <span class="text-cta">$</span> <span class="text-text">curl http://127.0.0.1:14060/api/v1/audit -H "X-Mnemlet-Key: $MNEMLET_API_KEY"</span>
-<span class="text-muted/60">{"events":[{"action":"ingest","result":"blocked"},{"action":"remember","result":"success"}]}</span>
+<span class="text-muted/60">{"events":[{"action":"ingest","result":"blocked"},{"action":"ingest","result":"success"}]}</span>
 
 <span class="text-cta">$</span> <span class="text-text">curl http://127.0.0.1:14060/api/v1/explain/7f4a... -H "X-Mnemlet-Key: $MNEMLET_API_KEY"</span>
 <span class="text-muted/60">{"memory_id":"7f4a...","trust":{"ingested_by":"rest","secret_guard_result":"clean"}}</span>
