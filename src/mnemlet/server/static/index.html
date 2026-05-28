@@ -123,6 +123,10 @@
         <h1 class="font-mono text-2xl font-bold">Übersicht</h1>
         <div class="flex items-center gap-3 text-xs font-mono text-muted/60">
           <span x-show="status">v<span x-text="status?.version"></span></span>
+          <span x-show="status?.intelligence" class="flex items-center gap-1.5" :title="status?.intelligence?.llm_model ? ('LLM: ' + status.intelligence.llm_model) : 'LLM disabled'">
+            <span class="w-2 h-2 rounded-full" :class="status?.intelligence?.extraction_active ? 'bg-cta' : 'bg-muted/40'"></span>
+            <span x-text="status?.intelligence?.extraction_active ? ('Extraction: an' + (status.intelligence.llm_model ? ' · ' + status.intelligence.llm_model : '')) : 'Extraction: aus'"></span>
+          </span>
           <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-cta animate-pulse"></span>Auto-Refresh 30s</span>
         </div>
       </div>
@@ -395,6 +399,19 @@
             </div>
           </div>
 
+          <!-- Metadata / provenance (e.g. v0.4 extraction-sourced memories) -->
+          <div class="bg-card border border-border rounded-xl p-5" x-show="hasMetadata()">
+            <p class="text-muted text-xs font-mono uppercase tracking-wider mb-3">Metadaten / Herkunft</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-sm">
+              <template x-for="entry in metaEntries()" :key="entry[0]">
+                <div>
+                  <p class="text-muted/60 text-xs mb-1" x-text="entry[0]"></p>
+                  <p class="break-all" :class="entry[0]==='source' && entry[1]==='extraction_pipeline' ? 'text-cta' : ''" x-text="fmtMeta(entry[1])"></p>
+                </div>
+              </template>
+            </div>
+          </div>
+
           <!-- Content -->
           <div class="bg-card border border-border rounded-xl p-6">
             <p class="text-muted text-xs font-mono uppercase tracking-wider mb-3">Content</p>
@@ -574,7 +591,7 @@ function dashboard() {
     auditResult: '',
     auditOffset: 0,
     auditPageSize: 100,
-    auditActions: ['ingest', 'recall', 'explain', 'forget', 'replace', 'confirm', 'audit', 'request'],
+    auditActions: ['ingest', 'observe', 'recall', 'explain', 'forget', 'replace', 'confirm', 'audit', 'request'],
 
     // ════ init ════
     init() {
@@ -866,6 +883,16 @@ function dashboard() {
       if (g === 'warning') return 'bg-yellow-500/15 text-yellow-300';
       if (g === 'legacy') return 'bg-bg text-muted';
       return 'bg-bg text-muted';
+    },
+    hasMetadata() {
+      return this.detail && this.detail.metadata && Object.keys(this.detail.metadata).length > 0;
+    },
+    metaEntries() {
+      return (this.detail && this.detail.metadata) ? Object.entries(this.detail.metadata) : [];
+    },
+    fmtMeta(v) {
+      if (v === null || v === undefined) return '—';
+      return (typeof v === 'string') ? v : JSON.stringify(v);
     },
     sleepStateColor(s) {
       if (s === 'running') return 'bg-yellow-500/15 text-yellow-300';

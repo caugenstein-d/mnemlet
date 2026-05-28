@@ -35,6 +35,9 @@ async def status(request: Request) -> dict[str, Any]:
     ).fetchone()[0]
     chroma_count = chroma.count()
 
+    config = request.app.state.config
+    llm_enabled = bool(getattr(config, "llm_enabled", False))
+
     return {
         "active_memories": active,
         "cold_storage_memories": cold,
@@ -43,6 +46,11 @@ async def status(request: Request) -> dict[str, Any]:
         "chroma_documents": chroma_count,
         "decay_distribution": db.retention_histogram(),
         "version": __version__,
+        "intelligence": {
+            "llm_enabled": llm_enabled,
+            "extraction_active": getattr(request.app.state, "extraction_pipeline", None) is not None,
+            "llm_model": getattr(config, "llm_model", None) if llm_enabled else None,
+        },
         "security": {
             "auth_configured": key_configured(getattr(request.app.state.config, "api_key", None)),
             "warnings": [w.to_dict() for w in getattr(request.app.state, "security_warnings", [])],

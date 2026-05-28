@@ -157,6 +157,41 @@ async def test_status_includes_total_and_decay_histogram() -> None:
         assert all("label" in b and "count" in b for b in hist)
 
 
+@pytest.mark.asyncio
+async def test_status_includes_intelligence_block_default_off() -> None:
+    async with _client() as client:
+        data = (await client.get("/api/v1/status")).json()
+    intel = data["intelligence"]
+    assert intel["llm_enabled"] is False
+    assert intel["extraction_active"] is False
+    assert intel["llm_model"] is None
+
+
+@pytest.mark.asyncio
+async def test_status_reports_extraction_active_when_enabled() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        config = MnemletConfig(
+            data_dir=base,
+            sqlite_path=base / "mnemlet.db",
+            chroma_path=base / "chroma",
+            vault_path=base / "vault",
+            embedding_cache_dir=base / "models",
+            llm_enabled=True,
+            extraction_enabled=True,
+            llm_model="gemma3:4b",
+        )
+        app = create_app(config)
+        async with app.router.lifespan_context(app):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                data = (await client.get("/api/v1/status")).json()
+    intel = data["intelligence"]
+    assert intel["llm_enabled"] is True
+    assert intel["extraction_active"] is True
+    assert intel["llm_model"] == "gemma3:4b"
+
+
 # ──────────────────────────── audit pagination ────────────────────────────
 
 
