@@ -109,12 +109,17 @@ def test_quickstart_does_not_pin_v0_2_0() -> None:
     )
 
 
-def test_pypi_gating_language_preserved() -> None:
-    """PyPI release remains gated until final release approval."""
+def test_pypi_installation_documented() -> None:
+    """PyPI installation is documented as the primary install method."""
     readme = Path("README.md").read_text()
     website = Path("website/index.html").read_text()
 
-    assert "PyPI" in readme
-    assert "gated" in readme.lower() or "release approval" in readme.lower()
-    assert "PyPI" in website
-    assert "gated" in website.lower() or "release approval" in website.lower()
+    assert "pip install mnemlet" in readme, (
+        "README.md should document 'pip install mnemlet' as primary install method"
+    )
+    assert "pip install mnemlet" in website, (
+        "website/index.html should document 'pip install mnemlet' as primary install method"
+    )
+    assert "pypi.org/project/mnemlet" in readme, (
+        "README.md should link to PyPI project page"
+    )

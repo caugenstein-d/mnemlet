@@ -8,7 +8,8 @@ Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](htt
 
 > **Pronounced** `/ˈnɛm.lɛt/` *("NEM-let")* — from Greek *mnēmē* (memory) + *-let* (diminutive: small). The CLI command is `mnemlet` (ASCII), the project name is **Mnémlet**.
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue)](https://github.com/christoph/mnemlet)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/christoph/mnemlet)
+[![PyPI](https://img.shields.io/pypi/v/mnemlet.svg)](https://pypi.org/project/mnemlet/)
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Pi-Tested](https://img.shields.io/badge/pi--tested-RPi%205%2016GB-brightgreen)](https://www.raspberrypi.com/)
@@ -28,14 +29,14 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 
 - 🧠 **Exponential decay + interaction-weighting** — Memories you recall and update stay sharp. What you ignore fades. No infinite hoarding.
 - 😴 **Sleep Engine** — Nightly consolidation runs while you're away: deduplicate, rescore stale memories, cluster related knowledge, and generate a morning briefing. Like your brain during REM sleep.
-- 🔌 **MCP-native with 14 tools** — `mnemlet_ingest`/`mnemlet_recall`/`mnemlet_search` for the basics, `mnemlet_context`/`mnemlet_explain` for context packs with provenance, `mnemlet_remember`/`mnemlet_forget`/`mnemlet_replace`/`mnemlet_confirm` for memory review, plus `mnemlet_status`/`mnemlet_namespaces`/`mnemlet_update`/`mnemlet_decay_config`/`mnemlet_export` for admin. Works with OpenWebUI, OpenClaw, Claude Code, Cursor, or any MCP client.
+- 🔌 **MCP-native with 15 tools** — `mnemlet_ingest`/`mnemlet_recall`/`mnemlet_search` for the basics, `mnemlet_context`/`mnemlet_explain` for context packs with provenance, `mnemlet_remember`/`mnemlet_forget`/`mnemlet_replace`/`mnemlet_confirm` for memory review, `mnemlet_audit` for security event inspection, plus `mnemlet_status`/`mnemlet_namespaces`/`mnemlet_update`/`mnemlet_decay_config`/`mnemlet_export` for admin. Works with OpenWebUI, OpenClaw, Claude Code, Cursor, or any MCP client.
 - 🛡️ **v0.3 Trust / Security / Privacy** — API-key auth, Secret Guard write protection, sanitized Audit logs, namespace trust policies, and backup/restore for local-first operators.
 - 📂 **Inspectable Markdown vault** — Every memory as a `.md` file with YAML frontmatter. Open in Obsidian. `grep` it. `git` it. No black box database lock-in.
 - 🤖 **Optional local LLM** — Plug in Gemma3:4b via Ollama. Runs CPU-only on a Pi. Enhances sleep consolidation (contradiction detection, summarization).
 - 🔍 **Hybrid search** — BM25 (SQLite FTS5) + vector similarity (ChromaDB). Both local, both free.
 - 🥧 **Pi-ready** — 450 MB RAM baseline, ~4 GB with LLM. Runs on a Raspberry Pi 5 (16 GB recommended for the full stack).
 - 💰 **Zero API costs** — Local ONNX embeddings (all-MiniLM-L6-v2). No OpenAI key, no cloud embedding service, no per-call charges. SearXNG optionally self-hosted for web enrichment.
-- 🐍 **Python SDK, REST API, CLI** — install from the GitHub tag for now, then `mnemlet serve`. PyPI follows after final release approval.
+- 🐍 **Python SDK, REST API, CLI** — `pip install mnemlet`, then `mnemlet serve`. Available on PyPI.
 
 ---
 
@@ -53,7 +54,7 @@ No checkmark bingo. Here's where Mnémlet shines, and where it doesn't.
 | **Inspectable vault** | ✅ (Markdown) | ❌ | ❌ | ⚠️ (beta) | ❌ |
 | **TUI Dashboard** | ❌ | ❌ | ❌ | ✅ | ❌ |
 | **Cloud sync** | ❌ | ✅ | ❌ | ✅ | ✅ |
-| **MCP tools** | 14 | ~10 | 29 | 19 | ❌ (API) |
+| **MCP tools** | 15 | ~10 | 29 | 19 | ❌ (API) |
 | **Language** | Python | Python | Python | Go | HTTP API |
 | **License** | MIT | Apache 2.0 | MIT | MIT | MIT |
 | **Pi-friendly RAM** | ✅ (450 MB) | ❌ | ✅ | ✅ | ❌ |
@@ -69,10 +70,14 @@ If your priority is **local-first, brain-inspired forgetting, sleep consolidatio
 ### Install
 
 ```bash
-pip install git+https://github.com/christoph/mnemlet.git
+pip install mnemlet
 ```
 
-> PyPI release follows after final v0.3 release approval.
+Or install from source for the latest development version:
+
+```bash
+pip install git+https://github.com/christoph/mnemlet.git
+```
 
 ### Start the server
 
