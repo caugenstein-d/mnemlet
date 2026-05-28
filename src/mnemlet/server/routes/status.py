@@ -38,8 +38,10 @@ async def status(request: Request) -> dict[str, Any]:
     return {
         "active_memories": active,
         "cold_storage_memories": cold,
+        "total_memories": db.count_memories(),
         "total_interactions": interactions,
         "chroma_documents": chroma_count,
+        "decay_distribution": db.retention_histogram(),
         "version": __version__,
         "security": {
             "auth_configured": key_configured(getattr(request.app.state.config, "api_key", None)),

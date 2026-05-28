@@ -361,15 +361,15 @@ class MnemletDB:
             item["details"] = {}
         return item
 
-    def query_audit(
+    def _audit_filter_sql(
         self,
-        namespace: str | None = None,
-        action: str | None = None,
-        since: str | None = None,
-        limit: int = 100,
-    ) -> list[dict[str, Any]]:
-        """Query audit events with optional filters."""
-        clauses = []
+        namespace: str | None,
+        action: str | None,
+        result: str | None,
+        since: str | None,
+    ) -> tuple[str, list[Any]]:
+        """Build a shared WHERE clause and params for audit queries."""
+        clauses: list[str] = []
         params: list[Any] = []
         if namespace:
             clauses.append("namespace = ?")
@@ -377,16 +377,47 @@ class MnemletDB:
         if action:
             clauses.append("action = ?")
             params.append(action)
+        if result:
+            clauses.append("result = ?")
+            params.append(result)
         if since:
             clauses.append("timestamp >= ?")
             params.append(since)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        return where, params
+
+    def query_audit(
+        self,
+        namespace: str | None = None,
+        action: str | None = None,
+        result: str | None = None,
+        since: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Query audit events with optional filters and pagination."""
+        where, params = self._audit_filter_sql(namespace, action, result, since)
         params.append(max(1, min(limit, 500)))
+        params.append(max(0, offset))
         rows = self.conn.execute(
-            f"SELECT * FROM audit_log{where} ORDER BY timestamp DESC, id DESC LIMIT ?",
+            f"SELECT * FROM audit_log{where} ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?",
             tuple(params),
         ).fetchall()
         return [self._audit_row_to_dict(row) for row in rows]
+
+    def count_audit(
+        self,
+        namespace: str | None = None,
+        action: str | None = None,
+        result: str | None = None,
+        since: str | None = None,
+    ) -> int:
+        """Count audit events matching the given filters."""
+        where, params = self._audit_filter_sql(namespace, action, result, since)
+        row = self.conn.execute(
+            f"SELECT COUNT(*) FROM audit_log{where}", tuple(params)
+        ).fetchone()
+        return int(row[0])
 
     def get_namespace_policy(self, namespace: str, key: str) -> str:
         """Return a namespace policy value, falling back to defaults."""
@@ -527,3 +558,82 @@ class MnemletDB:
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    # --- Dashboard read helpers ---
+
+    # Columns the dashboard may sort by. Sort columns can't be parameterized
+    # in SQL, so this allowlist guards against injection via the sort param.
+    LIST_SORT_COLUMNS = ("retention_score", "last_accessed_at", "created_at", "namespace")
+
+    def list_namespaces(self) -> list[str]:
+        """Return distinct non-deleted namespaces, alphabetically sorted."""
+        rows = self.conn.execute(
+            "SELECT DISTINCT namespace FROM memories WHERE status != 'deleted' ORDER BY namespace"
+        ).fetchall()
+        return [str(r["namespace"]) for r in rows]
+
+    def count_memories(self, namespace: str | None = None) -> int:
+        """Count non-deleted memories, optionally filtered by namespace."""
+        if namespace:
+            row = self.conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE status != 'deleted' AND namespace = ?",
+                (namespace,),
+            ).fetchone()
+        else:
+            row = self.conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE status != 'deleted'"
+            ).fetchone()
+        return int(row[0])
+
+    def list_memories_page(
+        self,
+        namespace: str | None = None,
+        sort_by: str = "last_accessed_at",
+        order: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Return a page of non-deleted memories for the dashboard list view."""
+        if sort_by not in self.LIST_SORT_COLUMNS:
+            sort_by = "last_accessed_at"
+        direction = "ASC" if str(order).lower() == "asc" else "DESC"
+        limit = max(1, min(limit, 5000))
+        offset = max(0, offset)
+        clauses = ["status != 'deleted'"]
+        params: list[Any] = []
+        if namespace:
+            clauses.append("namespace = ?")
+            params.append(namespace)
+        where = " WHERE " + " AND ".join(clauses)
+        params.extend([limit, offset])
+        rows = self.conn.execute(
+            f"""SELECT id, namespace, content_preview, retention_score, importance,
+                   created_at, last_accessed_at, access_count, status,
+                   memory_type, confirmation_count
+               FROM memories{where}
+               ORDER BY {sort_by} {direction}, id ASC
+               LIMIT ? OFFSET ?""",
+            tuple(params),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def retention_histogram(self) -> list[dict[str, Any]]:
+        """Return retention-score bucket counts over non-deleted memories.
+
+        Five fixed buckets of width 0.2 spanning [0.0, 1.0]; the top bucket
+        is inclusive of 1.0.
+        """
+        row = self.conn.execute(
+            """SELECT
+                   SUM(CASE WHEN retention_score < 0.2 THEN 1 ELSE 0 END) AS b0,
+                   SUM(CASE WHEN retention_score >= 0.2 AND retention_score < 0.4 THEN 1 ELSE 0 END) AS b1,
+                   SUM(CASE WHEN retention_score >= 0.4 AND retention_score < 0.6 THEN 1 ELSE 0 END) AS b2,
+                   SUM(CASE WHEN retention_score >= 0.6 AND retention_score < 0.8 THEN 1 ELSE 0 END) AS b3,
+                   SUM(CASE WHEN retention_score >= 0.8 THEN 1 ELSE 0 END) AS b4
+               FROM memories WHERE status != 'deleted'"""
+        ).fetchone()
+        labels = ["0.0–0.2", "0.2–0.4", "0.4–0.6", "0.6–0.8", "0.8–1.0"]
+        return [
+            {"label": labels[i], "count": int(row[f"b{i}"] or 0)}
+            for i in range(5)
+        ]

@@ -234,8 +234,10 @@ Every memory is a Markdown file with YAML frontmatter. You can read, edit, versi
 | Endpoint | Method | Description |
 |---|---|---|
 | `/api/v1/health` | GET | Health check |
-| `/api/v1/status` | GET | Memory counts, storage stats, decay info |
+| `/api/v1/status` | GET | Memory counts, storage stats, decay distribution, security info |
 | `/api/v1/vault` | GET | Vault path and file count |
+| `/api/v1/memories` | GET | Paginated memory list (`?limit=&offset=&namespace=&sort=&order=`) |
+| `/api/v1/memories/{id}` | GET | Single memory with full content, frontmatter, trust, and vault path |
 | `/api/v1/ingest` | POST | Store a memory |
 | `/api/v1/recall` | POST | Retrieve relevant memories |
 | `/api/v1/context` | POST | Build a context pack with abstention reasons |
@@ -250,6 +252,7 @@ Every memory is a Markdown file with YAML frontmatter. You can read, edit, versi
 | `/api/v1/sleep/start` | POST | Start sleep cycle manually |
 | `/api/v1/sleep/stop` | POST | Stop sleep cycle gracefully |
 | `/mcp` | SSE | MCP server endpoint (14 tools) |
+| `/ui` | GET | Read-only web dashboard (served without auth; data flows through the protected `/api/v1` endpoints) |
 
 ---
 

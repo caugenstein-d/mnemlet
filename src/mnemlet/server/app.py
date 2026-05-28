@@ -21,7 +21,7 @@ from mnemlet.engine.ingest import IngestEngine
 from mnemlet.engine.recall import RecallEngine
 from mnemlet.engine.decay import DecayEngine
 from mnemlet.engine.sleep import SleepEngine
-from mnemlet.server.routes import audit, context, decay, explain, ingest, recall, review, sleep, status
+from mnemlet.server.routes import audit, context, decay, explain, ingest, memories, recall, review, sleep, status, ui
 from mnemlet.server.mcp_server import create_mcp_server
 
 
@@ -198,8 +198,14 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Bump sleep engine activity on every API call."""
-        if hasattr(request.app.state, 'sleep_engine'):
+        """Bump sleep engine activity on every API call.
+
+        The read-only dashboard sends ``X-Mnemlet-UI: 1`` on its polls; that
+        traffic must not keep the engine awake, or a dashboard left open would
+        block nightly consolidation forever.
+        """
+        is_ui_poll = request.headers.get("x-mnemlet-ui") == "1"
+        if hasattr(request.app.state, 'sleep_engine') and not is_ui_poll:
             request.app.state.sleep_engine.bump_activity()
         response = await call_next(request)
         return response
@@ -224,6 +230,12 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Require API key when configured."""
+        # The dashboard shell carries no vault data and must load before the
+        # user can enter a key, so /ui is served without auth. All data still
+        # flows through the protected /api/v1 endpoints.
+        path = request.url.path
+        if path == "/ui" or path.startswith("/ui/"):
+            return await call_next(request)
         configured_key = getattr(request.app.state.config, "api_key", None)
         provided_key = extract_request_key(dict(request.headers))
         decision = validate_api_key(configured_key, provided_key)
@@ -237,10 +249,12 @@ def create_app(config: MnemletConfig | None = None) -> FastAPI:
     app.include_router(context.router)
     app.include_router(decay.router)
     app.include_router(ingest.router)
+    app.include_router(memories.router)
     app.include_router(recall.router)
     app.include_router(sleep.router)
     app.include_router(status.router)
     app.include_router(explain.router)
     app.include_router(review.router)
+    app.include_router(ui.router)
 
     return app

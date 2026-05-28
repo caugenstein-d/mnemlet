@@ -34,10 +34,20 @@ def _is_group_or_world_readable(path: Path) -> bool:
 def run_startup_security_checks(config: Any) -> list[SecurityCheck]:
     """Return non-blocking startup security warnings for a config."""
     checks: list[SecurityCheck] = []
-    if getattr(config, "server_host", "127.0.0.1") == "0.0.0.0":
+    host = getattr(config, "server_host", "127.0.0.1")
+    auth_configured = key_configured(getattr(config, "api_key", None))
+    if host == "0.0.0.0":
         checks.append(SecurityCheck("public_host", "warning", "server is bound to 0.0.0.0"))
-    if not key_configured(getattr(config, "api_key", None)):
+    if not auth_configured:
         checks.append(SecurityCheck("auth_missing", "warning", "no API key configured"))
+    if host == "0.0.0.0" and not auth_configured:
+        checks.append(
+            SecurityCheck(
+                "network_exposed",
+                "critical",
+                "server is bound to 0.0.0.0 without an API key — the vault is open on the network",
+            )
+        )
     for path_attr in ("sqlite_path", "vault_path", "data_dir"):
         path = Path(getattr(config, path_attr))
         if _is_group_or_world_readable(path):

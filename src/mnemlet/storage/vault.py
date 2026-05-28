@@ -53,18 +53,25 @@ access_count: {access_count}
 
         return file_path
 
-    def read_memory(self, namespace: str, memory_id: str) -> Optional[str]:
-        """Read a memory from the vault. Searches all month dirs."""
+    def find_memory_file(self, namespace: str, memory_id: str) -> Optional[Path]:
+        """Return the vault file path for a memory, searching all month dirs."""
         ns_dir = self.vault_path / namespace
         if not ns_dir.exists():
             return None
 
         for month_dir in sorted(ns_dir.iterdir(), reverse=True):
+            if not month_dir.is_dir():
+                continue
             file_path = month_dir / f"{memory_id}.md"
             if file_path.exists():
-                return file_path.read_text()
+                return file_path
 
         return None
+
+    def read_memory(self, namespace: str, memory_id: str) -> Optional[str]:
+        """Read a memory from the vault. Searches all month dirs."""
+        file_path = self.find_memory_file(namespace, memory_id)
+        return file_path.read_text() if file_path else None
 
     def list_memories(self, namespace: str, limit: int = 100) -> list[Path]:
         """List memory files for a namespace."""

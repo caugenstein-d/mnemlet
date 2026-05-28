@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mnémlet — Dashboard</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#0F172A',
+          card: '#1E293B',
+          cta: '#22C55E',
+          text: '#F8FAFC',
+          muted: '#94A3B8',
+          border: '#334155',
+        },
+        fontFamily: {
+          mono: ['"JetBrains Mono"', 'monospace'],
+          sans: ['"IBM Plex Sans"', 'sans-serif'],
+        },
+      }
+    }
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+<style>
+  [x-cloak] { display: none !important; }
+  .md-body h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 .5rem; }
+  .md-body h2 { font-size: 1.25rem; font-weight: 700; margin: 1rem 0 .5rem; }
+  .md-body h3 { font-size: 1.1rem; font-weight: 600; margin: .75rem 0 .5rem; }
+  .md-body p { margin: .5rem 0; line-height: 1.7; }
+  .md-body ul { list-style: disc; padding-left: 1.5rem; margin: .5rem 0; }
+  .md-body ol { list-style: decimal; padding-left: 1.5rem; margin: .5rem 0; }
+  .md-body li { margin: .25rem 0; }
+  .md-body code { background: #0B1120; padding: .1rem .35rem; border-radius: .25rem; font-family: "JetBrains Mono", monospace; font-size: .85em; color: #86efac; }
+  .md-body pre { background: #0B1120; padding: 1rem; border-radius: .5rem; overflow-x: auto; margin: .75rem 0; }
+  .md-body pre code { background: none; padding: 0; }
+  .md-body a { color: #22C55E; text-decoration: underline; }
+  .md-body blockquote { border-left: 3px solid #334155; padding-left: 1rem; color: #94A3B8; margin: .5rem 0; }
+  .md-body table { border-collapse: collapse; margin: .75rem 0; }
+  .md-body th, .md-body td { border: 1px solid #334155; padding: .4rem .6rem; }
+</style>
+</head>
+<body class="bg-bg text-text font-sans antialiased min-h-screen" x-data="dashboard()" x-init="init()">
+
+<!-- ── Critical security banner ── -->
+<template x-if="criticalWarning">
+  <div class="bg-red-600 text-white px-4 py-3 font-mono text-sm flex items-center gap-3 sticky top-0 z-40">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span><strong>Auth nicht konfiguriert — Vault ist im Netzwerk offen!</strong> <span class="opacity-80" x-text="criticalWarning.message"></span></span>
+  </div>
+</template>
+
+<!-- ── Non-critical warnings ── -->
+<template x-if="!criticalWarning && otherWarnings.length">
+  <div class="bg-yellow-500/15 border-b border-yellow-500/30 text-yellow-300 px-4 py-2 font-mono text-xs flex flex-wrap items-center gap-x-4 gap-y-1">
+    <span class="font-semibold">Hinweise:</span>
+    <template x-for="w in otherWarnings" :key="w.code">
+      <span x-text="w.message"></span>
+    </template>
+  </div>
+</template>
+
+<!-- ── Nav ── -->
+<nav class="border-b border-border bg-card/40 backdrop-blur sticky z-30" :class="criticalWarning ? '' : 'top-0'">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+    <a href="/ui" @click.prevent="go('dashboard')" class="flex items-center gap-2.5 cursor-pointer group">
+      <span class="text-2xl">🧠</span>
+      <span class="font-mono font-bold text-lg tracking-tight group-hover:text-cta transition-colors">Mnémlet</span>
+      <span class="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.2em] text-muted/60 border border-border rounded px-1.5 py-0.5">Dashboard</span>
+    </a>
+    <div class="flex items-center gap-1 sm:gap-2">
+      <a href="/ui" @click.prevent="go('dashboard')" class="px-3 py-1.5 rounded-lg font-mono text-sm cursor-pointer transition-colors" :class="route.name==='dashboard' ? 'bg-cta/15 text-cta' : 'text-muted hover:text-text'">Übersicht</a>
+      <a href="/ui/memories" @click.prevent="go('memories')" class="px-3 py-1.5 rounded-lg font-mono text-sm cursor-pointer transition-colors" :class="(route.name==='memories'||route.name==='detail') ? 'bg-cta/15 text-cta' : 'text-muted hover:text-text'">Memories</a>
+      <a href="/ui/audit" @click.prevent="go('audit')" class="px-3 py-1.5 rounded-lg font-mono text-sm cursor-pointer transition-colors" :class="route.name==='audit' ? 'bg-cta/15 text-cta' : 'text-muted hover:text-text'">Audit</a>
+      <button x-show="apiKey" @click="logout()" class="ml-1 px-3 py-1.5 rounded-lg font-mono text-sm text-muted hover:text-red-400 border border-border hover:border-red-400/40 transition-colors cursor-pointer" title="API-Key aus diesem Browser entfernen">Logout</button>
+    </div>
+  </div>
+</nav>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-8" x-cloak>
+
+  <!-- ════════ Login modal ════════ -->
+  <template x-if="authRequired">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm px-4">
+      <div class="bg-card border border-border rounded-2xl p-8 max-w-md w-full shadow-2xl">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="text-3xl">🔐</span>
+          <h2 class="font-mono text-xl font-bold">Anmeldung erforderlich</h2>
+        </div>
+        <p class="text-muted text-sm leading-relaxed mb-5">Dieser Mnémlet-Server verlangt einen API-Key. Er wird nur in diesem Browser (<code class="text-cta/80">localStorage</code>) gespeichert und als <code class="text-cta/80">X-Mnemlet-Key</code> gesendet.</p>
+        <form @submit.prevent="saveKey()">
+          <input x-model="keyInput" type="password" autocomplete="off" placeholder="mnemlet_..."
+            class="w-full bg-bg border border-border rounded-lg px-4 py-3 font-mono text-sm focus:outline-none focus:border-cta/60 mb-2" autofocus>
+          <p x-show="loginError" x-text="loginError" class="text-red-400 text-xs font-mono mb-2"></p>
+          <button type="submit" class="w-full bg-cta text-bg font-mono font-semibold rounded-lg py-3 hover:bg-cta/90 transition-colors cursor-pointer mt-2">Speichern & verbinden</button>
+        </form>
+      </div>
+    </div>
+  </template>
+
+  <!-- ════════ Global error ════════ -->
+  <template x-if="error && !authRequired">
+    <div class="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-4 mb-6 font-mono text-sm flex items-center justify-between gap-4">
+      <span x-text="error"></span>
+      <button @click="reloadView()" class="text-cta hover:underline cursor-pointer shrink-0">Erneut versuchen</button>
+    </div>
+  </template>
+
+  <!-- ════════ DASHBOARD ════════ -->
+  <template x-if="route.name==='dashboard' && !authRequired">
+    <div>
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="font-mono text-2xl font-bold">Übersicht</h1>
+        <div class="flex items-center gap-3 text-xs font-mono text-muted/60">
+          <span x-show="status">v<span x-text="status?.version"></span></span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-cta animate-pulse"></span>Auto-Refresh 30s</span>
+        </div>
+      </div>
+
+      <template x-if="loading && !status">
+        <div class="text-muted font-mono text-sm py-12 text-center">Lädt…</div>
+      </template>
+
+      <template x-if="status">
+        <div>
+          <!-- Stat cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-card border border-border rounded-xl p-5">
+              <p class="text-muted text-xs font-mono uppercase tracking-wider mb-1">Total Memories</p>
+              <p class="font-mono text-3xl font-bold" x-text="status.total_memories ?? '—'"></p>
+            </div>
+            <div class="bg-card border border-border rounded-xl p-5">
+              <p class="text-muted text-xs font-mono uppercase tracking-wider mb-1">Active</p>
+              <p class="font-mono text-3xl font-bold text-cta" x-text="status.active_memories ?? '—'"></p>
+            </div>
+            <div class="bg-card border border-border rounded-xl p-5">
+              <p class="text-muted text-xs font-mono uppercase tracking-wider mb-1">Cold Storage</p>
+              <p class="font-mono text-3xl font-bold text-sky-400" x-text="status.cold_storage_memories ?? '—'"></p>
+            </div>
+            <div class="bg-card border border-border rounded-xl p-5">
+              <p class="text-muted text-xs font-mono uppercase tracking-wider mb-1">Interactions</p>
+              <p class="font-mono text-3xl font-bold" x-text="status.total_interactions ?? '—'"></p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Decay histogram -->
+            <div class="bg-card border border-border rounded-xl p-6">
+              <h2 class="font-mono font-semibold mb-1">Decay-Verteilung</h2>
+              <p class="text-muted/60 text-xs mb-5">Retention Scores über alle Memories</p>
+              <div class="flex items-end justify-between gap-2 h-40">
+                <template x-for="(b, i) in (status.decay_distribution || [])" :key="i">
+                  <div class="flex-1 flex flex-col items-center justify-end h-full gap-2">
+                    <span class="font-mono text-xs text-muted" x-text="b.count"></span>
+                    <div class="w-full rounded-t transition-all" :class="histBarColor(i)"
+                      :style="`height: ${histBarHeight(b.count)}%; min-height: 2px;`"></div>
+                    <span class="font-mono text-[10px] text-muted/60 whitespace-nowrap" x-text="b.label"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Sleep engine -->
+            <div class="bg-card border border-border rounded-xl p-6">
+              <h2 class="font-mono font-semibold mb-4">Sleep-Engine</h2>
+              <template x-if="sleep">
+                <div class="space-y-3 text-sm font-mono">
+                  <div class="flex justify-between items-center">
+                    <span class="text-muted">Status</span>
+                    <span class="px-2 py-0.5 rounded text-xs" :class="sleepStateColor(sleep.state)" x-text="sleep.state"></span>
+                  </div>
+                  <div class="flex justify-between"><span class="text-muted">Inaktiv seit</span><span x-text="fmtDuration(sleep.idle_seconds)"></span></div>
+                  <div class="flex justify-between"><span class="text-muted">Schwelle</span><span x-text="fmtDuration(sleep.threshold_seconds)"></span></div>
+                  <div class="flex justify-between"><span class="text-muted">Nächster Run</span><span class="text-cta" x-text="nextRun()"></span></div>
+                  <div class="flex justify-between"><span class="text-muted">Letzte Konsolidierung</span><span x-text="sleep.last_completed ? 'abgeschlossen' : 'noch keine'"></span></div>
+                  <div class="pt-2 border-t border-border">
+                    <p class="text-muted text-xs mb-2">Konsolidierungs-Aufgaben</p>
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <template x-for="t in sleepTasks()" :key="t.key">
+                        <div class="flex items-center gap-1.5 text-xs">
+                          <span :class="t.done ? 'text-cta' : 'text-muted/40'" x-text="t.done ? '✓' : '○'"></span>
+                          <span :class="t.done ? 'text-text' : 'text-muted/60'" x-text="t.label"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Recent audit -->
+          <div class="bg-card border border-border rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between p-5 border-b border-border">
+              <h2 class="font-mono font-semibold">Letzte Audit-Events</h2>
+              <a href="/ui/audit" @click.prevent="go('audit')" class="text-cta text-sm font-mono hover:underline cursor-pointer">Alle →</a>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="text-muted/60 font-mono text-xs uppercase tracking-wider">
+                  <tr class="border-b border-border/50">
+                    <th class="text-left p-3 font-medium">Zeit</th>
+                    <th class="text-left p-3 font-medium">Action</th>
+                    <th class="text-left p-3 font-medium">Namespace</th>
+                    <th class="text-left p-3 font-medium">Result</th>
+                  </tr>
+                </thead>
+                <tbody class="font-mono text-xs">
+                  <template x-for="e in recentAudit" :key="e.id">
+                    <tr class="border-b border-border/30 hover:bg-bg/40">
+                      <td class="p-3 text-muted whitespace-nowrap" x-text="fmtDate(e.timestamp)"></td>
+                      <td class="p-3" x-text="e.action"></td>
+                      <td class="p-3 text-muted" x-text="e.namespace"></td>
+                      <td class="p-3"><span class="px-1.5 py-0.5 rounded text-[10px]" :class="resultColor(e.result)" x-text="e.result"></span></td>
+                    </tr>
+                  </template>
+                  <template x-if="!recentAudit.length">
+                    <tr><td colspan="4" class="p-6 text-center text-muted/50">Keine Events</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- ════════ MEMORY LIST ════════ -->
+  <template x-if="route.name==='memories' && !authRequired">
+    <div>
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h1 class="font-mono text-2xl font-bold">Memories <span class="text-muted/50 text-base font-normal" x-text="`(${total})`"></span></h1>
+      </div>
+
+      <!-- Controls -->
+      <div class="bg-card border border-border rounded-xl p-4 mb-5 flex flex-wrap items-end gap-4">
+        <div>
+          <label class="block text-muted text-xs font-mono uppercase tracking-wider mb-1">Namespace</label>
+          <select x-model="filterNamespace" @change="offset=0; loadMemories()" class="bg-bg border border-border rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-cta/60 min-w-[160px]">
+            <option value="">Alle</option>
+            <template x-for="ns in namespaces" :key="ns"><option :value="ns" x-text="ns"></option></template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-muted text-xs font-mono uppercase tracking-wider mb-1">Sortierung</label>
+          <select x-model="sort" @change="offset=0; loadMemories()" class="bg-bg border border-border rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-cta/60">
+            <option value="last_accessed_at">Letzte Interaktion</option>
+            <option value="retention_score">Retention Score</option>
+            <option value="created_at">Erstellt</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-muted text-xs font-mono uppercase tracking-wider mb-1">Reihenfolge</label>
+          <button @click="order = order==='desc'?'asc':'desc'; loadMemories()" class="bg-bg border border-border rounded-lg px-3 py-2 font-mono text-sm hover:border-cta/60 cursor-pointer min-w-[100px] text-left">
+            <span x-text="order==='desc' ? '↓ Absteigend' : '↑ Aufsteigend'"></span>
+          </button>
+        </div>
+        <div>
+          <label class="block text-muted text-xs font-mono uppercase tracking-wider mb-1">Pro Seite</label>
+          <select x-model.number="pageSize" @change="offset=0; loadMemories()" class="bg-bg border border-border rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-cta/60">
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+            <option :value="500">500</option>
+            <option :value="1000">1000</option>
+          </select>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-muted text-xs font-mono uppercase tracking-wider mb-1">Suche (aktuelle Seite)</label>
+          <input x-model="search" type="text" placeholder="Volltext in Vorschau…" class="w-full bg-bg border border-border rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-cta/60">
+        </div>
+      </div>
+
+      <template x-if="loading">
+        <div class="text-muted font-mono text-sm py-12 text-center">Lädt…</div>
+      </template>
+
+      <template x-if="!loading">
+        <div class="bg-card border border-border rounded-xl overflow-hidden">
+          <!-- header + virtual-scroll body share a column grid -->
+          <div class="overflow-x-auto">
+            <div class="min-w-[760px]">
+              <!-- header -->
+              <div class="grid grid-cols-[minmax(120px,1fr)_minmax(220px,2.5fr)_120px_180px_120px] border-b border-border text-muted/60 font-mono text-xs uppercase tracking-wider bg-bg/30">
+                <div class="p-3">Namespace</div>
+                <div class="p-3">Content</div>
+                <div class="p-3 cursor-pointer hover:text-text select-none" @click="toggleSort('retention_score')">Retention <span x-text="sortArrow('retention_score')"></span></div>
+                <div class="p-3 cursor-pointer hover:text-text select-none" @click="toggleSort('last_accessed_at')">Letzte Interaktion <span x-text="sortArrow('last_accessed_at')"></span></div>
+                <div class="p-3">Typ</div>
+              </div>
+
+              <!-- Non-virtual body (<= 500 rows) -->
+              <template x-if="!isVirtual()">
+                <div>
+                  <template x-for="m in filteredMemories()" :key="m.id">
+                    <div @click="go('detail', m.id)" class="grid grid-cols-[minmax(120px,1fr)_minmax(220px,2.5fr)_120px_180px_120px] border-b border-border/30 hover:bg-bg/40 cursor-pointer items-center" style="height:52px">
+                      <div class="px-3 truncate font-mono text-xs text-muted" x-text="m.namespace"></div>
+                      <div class="px-3 truncate text-sm" x-text="preview(m.content_preview)"></div>
+                      <div class="px-3"><span class="px-2 py-0.5 rounded font-mono text-xs" :class="scoreColor(m.retention_score)" x-text="fmtScore(m.retention_score)"></span></div>
+                      <div class="px-3 font-mono text-xs text-muted whitespace-nowrap" x-text="fmtDate(m.last_accessed_at)"></div>
+                      <div class="px-3"><span class="font-mono text-[10px] text-muted/80" x-text="m.memory_type || '—'"></span></div>
+                    </div>
+                  </template>
+                  <template x-if="!filteredMemories().length">
+                    <div class="p-10 text-center text-muted/50 font-mono text-sm">Keine Memories gefunden</div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Virtual-scroll body (> 500 rows) -->
+              <template x-if="isVirtual()">
+                <div class="overflow-y-auto" :style="`height:${listViewportH}px`" @scroll.passive="scrollTop = $event.target.scrollTop">
+                  <div :style="`height:${filteredMemories().length * ROW_H}px; position:relative`">
+                    <div :style="`position:absolute; top:0; left:0; right:0; transform:translateY(${vStart()*ROW_H}px)`">
+                      <template x-for="m in vSlice()" :key="m.id">
+                        <div @click="go('detail', m.id)" class="grid grid-cols-[minmax(120px,1fr)_minmax(220px,2.5fr)_120px_180px_120px] border-b border-border/30 hover:bg-bg/40 cursor-pointer items-center" style="height:52px">
+                          <div class="px-3 truncate font-mono text-xs text-muted" x-text="m.namespace"></div>
+                          <div class="px-3 truncate text-sm" x-text="preview(m.content_preview)"></div>
+                          <div class="px-3"><span class="px-2 py-0.5 rounded font-mono text-xs" :class="scoreColor(m.retention_score)" x-text="fmtScore(m.retention_score)"></span></div>
+                          <div class="px-3 font-mono text-xs text-muted whitespace-nowrap" x-text="fmtDate(m.last_accessed_at)"></div>
+                          <div class="px-3"><span class="font-mono text-[10px] text-muted/80" x-text="m.memory_type || '—'"></span></div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div class="flex items-center justify-between p-4 border-t border-border font-mono text-sm">
+            <span class="text-muted text-xs" x-text="pageInfo()"></span>
+            <div class="flex items-center gap-2">
+              <button @click="prevPage()" :disabled="offset===0" class="px-3 py-1.5 rounded-lg border border-border hover:border-cta/60 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">← Zurück</button>
+              <button @click="nextPage()" :disabled="offset + pageSize >= total" class="px-3 py-1.5 rounded-lg border border-border hover:border-cta/60 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">Weiter →</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- ════════ MEMORY DETAIL ════════ -->
+  <template x-if="route.name==='detail' && !authRequired">
+    <div>
+      <button @click="go('memories')" class="text-cta font-mono text-sm hover:underline cursor-pointer mb-5 inline-flex items-center gap-1">← Zurück zur Liste</button>
+
+      <template x-if="loading">
+        <div class="text-muted font-mono text-sm py-12 text-center">Lädt…</div>
+      </template>
+
+      <template x-if="detail && !loading">
+        <div class="space-y-6">
+          <!-- Header -->
+          <div class="bg-card border border-border rounded-xl p-6">
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+              <span class="font-mono text-xs px-2 py-0.5 rounded bg-bg border border-border text-muted" x-text="detail.namespace"></span>
+              <span class="font-mono text-xs px-2 py-0.5 rounded" :class="statusBadge(detail.status)" x-text="detail.status"></span>
+              <span x-show="detail.memory_type" class="font-mono text-xs px-2 py-0.5 rounded bg-cta/10 text-cta" x-text="detail.memory_type"></span>
+              <span class="font-mono text-xs px-2 py-0.5 rounded ml-auto" :class="scoreColor(detail.retention_score)" x-text="'Retention ' + fmtScore(detail.retention_score)"></span>
+            </div>
+            <p class="font-mono text-xs text-muted/60 break-all" x-text="detail.id"></p>
+          </div>
+
+          <!-- File path -->
+          <div class="bg-card border border-border rounded-xl p-5">
+            <p class="text-muted text-xs font-mono uppercase tracking-wider mb-2">Dateipfad</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <code class="font-mono text-sm text-cta/90 bg-bg px-3 py-2 rounded-lg flex-1 break-all" x-text="detail.file.display_path"></code>
+              <button @click="copyPath(detail.file.path || detail.file.display_path)" class="px-3 py-2 rounded-lg border border-border hover:border-cta/60 font-mono text-xs cursor-pointer whitespace-nowrap" x-text="copied ? 'Kopiert!' : 'Pfad kopieren'"></button>
+            </div>
+            <p class="text-muted/50 text-xs mt-2" x-show="detail.file.exists">macOS: im Finder mit Rechtsklick → „Im übergeordneten Ordner anzeigen". Linux: im Dateimanager öffnen.</p>
+            <p class="text-yellow-400/70 text-xs mt-2" x-show="!detail.file.exists">Kein Vault-File gefunden (System-/Legacy-Memory) — Vorschau aus der Datenbank.</p>
+          </div>
+
+          <!-- Trust -->
+          <div class="bg-card border border-border rounded-xl p-5">
+            <p class="text-muted text-xs font-mono uppercase tracking-wider mb-3">Trust-Metadaten</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono text-sm">
+              <div><p class="text-muted/60 text-xs mb-1">ingested_by</p><p x-text="detail.trust.ingested_by"></p></div>
+              <div><p class="text-muted/60 text-xs mb-1">caller_identity</p><p class="break-all" x-text="detail.trust.caller_identity"></p></div>
+              <div><p class="text-muted/60 text-xs mb-1">secret_guard</p><p><span class="px-1.5 py-0.5 rounded text-xs" :class="guardColor(detail.trust.secret_guard_result)" x-text="detail.trust.secret_guard_result"></span></p></div>
+              <div><p class="text-muted/60 text-xs mb-1">confirmations</p><p x-text="detail.trust.confirmation_count"></p></div>
+            </div>
+          </div>
+
+          <!-- Content -->
+          <div class="bg-card border border-border rounded-xl p-6">
+            <p class="text-muted text-xs font-mono uppercase tracking-wider mb-3">Content</p>
+            <div class="md-body text-sm" x-html="renderMarkdown(detail.content)"></div>
+          </div>
+
+          <!-- Frontmatter -->
+          <div class="bg-card border border-border rounded-xl p-6" x-show="detail.frontmatter">
+            <p class="text-muted text-xs font-mono uppercase tracking-wider mb-3">YAML-Frontmatter</p>
+            <pre class="bg-bg rounded-lg p-4 overflow-x-auto font-mono text-xs text-muted"><code x-text="detail.frontmatter"></code></pre>
+          </div>
+
+          <!-- Audit trail (lazy) -->
+          <div class="bg-card border border-border rounded-xl overflow-hidden">
+            <button @click="toggleDetailAudit()" class="w-full flex items-center justify-between p-5 cursor-pointer hover:bg-bg/30">
+              <p class="text-muted text-xs font-mono uppercase tracking-wider">Audit-Trail (letzte 10)</p>
+              <span class="font-mono text-cta text-sm" x-text="showDetailAudit ? '−' : '+'"></span>
+            </button>
+            <template x-if="showDetailAudit">
+              <div class="border-t border-border">
+                <template x-if="detailAuditLoading">
+                  <div class="p-5 text-muted/50 font-mono text-xs text-center">Lädt…</div>
+                </template>
+                <template x-if="!detailAuditLoading">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs font-mono">
+                      <thead class="text-muted/60 uppercase tracking-wider">
+                        <tr class="border-b border-border/50">
+                          <th class="text-left p-3 font-medium">Zeit</th>
+                          <th class="text-left p-3 font-medium">Action</th>
+                          <th class="text-left p-3 font-medium">Result</th>
+                          <th class="text-left p-3 font-medium">Caller</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="e in detailAudit" :key="e.id">
+                          <tr class="border-b border-border/30">
+                            <td class="p-3 text-muted whitespace-nowrap" x-text="fmtDate(e.timestamp)"></td>
+                            <td class="p-3" x-text="e.action"></td>
+                            <td class="p-3"><span class="px-1.5 py-0.5 rounded text-[10px]" :class="resultColor(e.result)" x-text="e.result"></span></td>
+                            <td class="p-3 text-muted" x-text="e.caller_identity || e.caller || '—'"></td>
+                          </tr>
+                        </template>
+                        <template x-if="detailAudit && !detailAudit.length">
+                          <tr><td colspan="4" class="p-5 text-center text-muted/50">Keine Events</td></tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- ════════ AUDIT LOG ════════ -->
+  <template x-if="route.name==='audit' && !authRequired">
+    <div>
+      <h1 class="font-mono text-2xl font-bold mb-5">Audit-Log <span class="text-muted/50 text-base font-normal" x-text="`(${auditTotal})`"></span></h1>
+
+      <div class="bg-card border border-border rounded-xl p-4 mb-5 flex flex-wrap items-end gap-4">
+        <div>
+          <label class="block text-muted text-xs font-mono uppercase tracking-wider mb-1">Action</label>
+          <select x-model="auditAction" @change="auditOffset=0; loadAudit()" class="bg-bg border border-border rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-cta/60 min-w-[140px]">
+            <option value="">Alle</option>
+            <template x-for="a in auditActions" :key="a"><option :value="a" x-text="a"></option></template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-muted text-xs font-mono uppercase tracking-wider mb-1">Result</label>
+          <select x-model="auditResult" @change="auditOffset=0; loadAudit()" class="bg-bg border border-border rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:border-cta/60 min-w-[140px]">
+            <option value="">Alle</option>
+            <option value="success">success</option>
+            <option value="blocked">blocked</option>
+            <option value="denied">denied</option>
+            <option value="warning">warning</option>
+          </select>
+        </div>
+      </div>
+
+      <template x-if="loading">
+        <div class="text-muted font-mono text-sm py-12 text-center">Lädt…</div>
+      </template>
+
+      <template x-if="!loading">
+        <div class="bg-card border border-border rounded-xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-muted/60 font-mono text-xs uppercase tracking-wider bg-bg/30">
+                <tr class="border-b border-border">
+                  <th class="text-left p-3 font-medium whitespace-nowrap">Timestamp</th>
+                  <th class="text-left p-3 font-medium">Action</th>
+                  <th class="text-left p-3 font-medium">Namespace</th>
+                  <th class="text-left p-3 font-medium">Result</th>
+                  <th class="text-left p-3 font-medium">Caller Identity</th>
+                </tr>
+              </thead>
+              <tbody class="font-mono text-xs">
+                <template x-for="e in auditEvents" :key="e.id">
+                  <tr class="border-b border-border/30 hover:bg-bg/40">
+                    <td class="p-3 text-muted whitespace-nowrap" x-text="fmtDate(e.timestamp)"></td>
+                    <td class="p-3" x-text="e.action"></td>
+                    <td class="p-3 text-muted" x-text="e.namespace"></td>
+                    <td class="p-3"><span class="px-1.5 py-0.5 rounded text-[10px]" :class="resultColor(e.result)" x-text="e.result"></span></td>
+                    <td class="p-3 text-muted" x-text="e.caller_identity || e.caller || '—'"></td>
+                  </tr>
+                </template>
+                <template x-if="!auditEvents.length">
+                  <tr><td colspan="5" class="p-10 text-center text-muted/50">Keine Events</td></tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex items-center justify-between p-4 border-t border-border font-mono text-sm">
+            <span class="text-muted text-xs" x-text="auditPageInfo()"></span>
+            <div class="flex items-center gap-2">
+              <button @click="auditPrev()" :disabled="auditOffset===0" class="px-3 py-1.5 rounded-lg border border-border hover:border-cta/60 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">← Zurück</button>
+              <button @click="auditNext()" :disabled="auditOffset + auditPageSize >= auditTotal" class="px-3 py-1.5 rounded-lg border border-border hover:border-cta/60 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">Weiter →</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+</main>
+
+<footer class="max-w-7xl mx-auto px-6 py-8 text-center" x-cloak>
+  <p class="font-mono text-muted/40 text-xs">Mnémlet Dashboard — read-only. Bearbeiten &amp; Löschen nur über CLI.</p>
+</footer>
+
+<script>
+function dashboard() {
+  return {
+    // ── routing ──
+    route: { name: 'dashboard' },
+    // ── auth ──
+    apiKey: '',
+    authRequired: false,
+    keyInput: '',
+    loginError: '',
+    // ── shared ──
+    loading: false,
+    error: null,
+    pollTimer: null,
+    copied: false,
+    // ── dashboard ──
+    status: null,
+    sleep: null,
+    recentAudit: [],
+    // ── memories ──
+    memories: [],
+    total: 0,
+    namespaces: [],
+    filterNamespace: '',
+    sort: 'last_accessed_at',
+    order: 'desc',
+    pageSize: 50,
+    offset: 0,
+    search: '',
+    scrollTop: 0,
+    listViewportH: 600,
+    ROW_H: 52,
+    BUFFER: 8,
+    // ── detail ──
+    detail: null,
+    showDetailAudit: false,
+    detailAudit: null,
+    detailAuditLoading: false,
+    // ── audit ──
+    auditEvents: [],
+    auditTotal: 0,
+    auditAction: '',
+    auditResult: '',
+    auditOffset: 0,
+    auditPageSize: 100,
+    auditActions: ['ingest', 'recall', 'explain', 'forget', 'replace', 'confirm', 'audit', 'request'],
+
+    // ════ init ════
+    init() {
+      this.apiKey = localStorage.getItem('mnemlet_key') || '';
+      this.route = this.parseRoute();
+      this.computeViewport();
+      window.addEventListener('popstate', () => { this.route = this.parseRoute(); this.reloadView(); });
+      window.addEventListener('resize', () => this.computeViewport());
+      this.bootstrap();
+      this.pollTimer = setInterval(() => this.poll(), 30000);
+    },
+
+    computeViewport() { this.listViewportH = Math.max(360, window.innerHeight - 360); },
+
+    // ════ routing ════
+    parseRoute() {
+      let p = location.pathname;
+      if (p.startsWith('/ui')) p = p.slice(3);
+      p = p.replace(/^\/+/, '');
+      if (p === '') return { name: 'dashboard' };
+      if (p === 'memories') return { name: 'memories' };
+      if (p === 'audit') return { name: 'audit' };
+      if (p.startsWith('memory/')) return { name: 'detail', id: decodeURIComponent(p.slice(7)) };
+      return { name: 'dashboard' };
+    },
+    pathFor(view, id) {
+      if (view === 'memories') return '/ui/memories';
+      if (view === 'audit') return '/ui/audit';
+      if (view === 'detail') return '/ui/memory/' + encodeURIComponent(id);
+      return '/ui';
+    },
+    go(view, id) {
+      const path = this.pathFor(view, id);
+      if (path !== location.pathname) history.pushState({}, '', path);
+      this.route = this.parseRoute();
+      window.scrollTo(0, 0);
+      this.reloadView();
+    },
+
+    // ════ data flow ════
+    async bootstrap() {
+      try { await this.loadStatus(); }
+      catch (e) { return; } // 401 → authRequired modal
+      this.reloadView();
+    },
+    reloadView() {
+      this.error = null;
+      const n = this.route.name;
+      if (n === 'dashboard') this.loadDashboard();
+      else if (n === 'memories') this.loadMemories();
+      else if (n === 'detail') this.loadDetail();
+      else if (n === 'audit') this.loadAudit();
+    },
+    poll() {
+      if (this.authRequired) return;
+      this.loadStatus().catch(() => {});
+      if (this.route.name === 'dashboard') this.loadDashboard(true);
+      else if (this.route.name === 'audit') this.loadAudit(true);
+    },
+
+    async api(path) {
+      const headers = { 'X-Mnemlet-UI': '1' };
+      if (this.apiKey) headers['X-Mnemlet-Key'] = this.apiKey;
+      const res = await fetch(path, { headers });
+      if (res.status === 401) { this.authRequired = true; throw new Error('unauthorized'); }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    },
+
+    async loadStatus() {
+      const s = await this.api('/api/v1/status');
+      this.status = s;
+      this.authRequired = false;
+    },
+
+    async loadDashboard(silent) {
+      if (!silent) this.loading = true;
+      try {
+        const [sleep, audit] = await Promise.all([
+          this.api('/api/v1/sleep/status'),
+          this.api('/api/v1/audit?limit=10'),
+        ]);
+        this.sleep = sleep;
+        this.recentAudit = audit.events || [];
+      } catch (e) { if (!this.authRequired) this.error = 'Konnte Dashboard nicht laden: ' + e.message; }
+      finally { this.loading = false; }
+    },
+
+    async loadMemories(silent) {
+      if (!silent) this.loading = true;
+      this.scrollTop = 0;
+      try {
+        const q = new URLSearchParams({
+          limit: this.pageSize, offset: this.offset, sort: this.sort, order: this.order,
+        });
+        if (this.filterNamespace) q.set('namespace', this.filterNamespace);
+        const data = await this.api('/api/v1/memories?' + q.toString());
+        this.memories = data.memories || [];
+        this.total = data.total || 0;
+        this.namespaces = data.namespaces || [];
+      } catch (e) { if (!this.authRequired) this.error = 'Konnte Memories nicht laden: ' + e.message; }
+      finally { this.loading = false; }
+    },
+
+    async loadDetail() {
+      this.loading = true;
+      this.detail = null;
+      this.showDetailAudit = false;
+      this.detailAudit = null;
+      try {
+        this.detail = await this.api('/api/v1/memories/' + encodeURIComponent(this.route.id));
+      } catch (e) { if (!this.authRequired) this.error = 'Memory nicht gefunden: ' + e.message; }
+      finally { this.loading = false; }
+    },
+
+    async toggleDetailAudit() {
+      this.showDetailAudit = !this.showDetailAudit;
+      if (this.showDetailAudit && this.detailAudit === null) {
+        this.detailAuditLoading = true;
+        try {
+          const data = await this.api('/api/v1/explain/' + encodeURIComponent(this.route.id));
+          this.detailAudit = (data.audit_trail || []).slice(0, 10);
+        } catch (e) { this.detailAudit = []; }
+        finally { this.detailAuditLoading = false; }
+      }
+    },
+
+    async loadAudit(silent) {
+      if (!silent) this.loading = true;
+      try {
+        const q = new URLSearchParams({ limit: this.auditPageSize, offset: this.auditOffset });
+        if (this.auditAction) q.set('action', this.auditAction);
+        if (this.auditResult) q.set('result', this.auditResult);
+        const data = await this.api('/api/v1/audit?' + q.toString());
+        this.auditEvents = data.events || [];
+        this.auditTotal = data.total || 0;
+      } catch (e) { if (!this.authRequired) this.error = 'Konnte Audit-Log nicht laden: ' + e.message; }
+      finally { this.loading = false; }
+    },
+
+    // ════ auth actions ════
+    saveKey() {
+      const k = this.keyInput.trim();
+      if (!k) { this.loginError = 'Bitte einen Key eingeben.'; return; }
+      this.apiKey = k;
+      localStorage.setItem('mnemlet_key', k);
+      this.keyInput = '';
+      this.loginError = '';
+      this.bootstrap();
+    },
+    logout() {
+      localStorage.removeItem('mnemlet_key');
+      this.apiKey = '';
+      this.bootstrap();
+    },
+
+    // ════ memories: pagination & virtual scroll ════
+    filteredMemories() {
+      if (!this.search.trim()) return this.memories;
+      const q = this.search.toLowerCase();
+      return this.memories.filter(m => (m.content_preview || '').toLowerCase().includes(q));
+    },
+    isVirtual() { return this.filteredMemories().length > 500; },
+    vStart() {
+      const s = Math.floor(this.scrollTop / this.ROW_H) - this.BUFFER;
+      return Math.max(0, s);
+    },
+    vEnd() {
+      const visible = Math.ceil(this.listViewportH / this.ROW_H) + this.BUFFER * 2;
+      return Math.min(this.filteredMemories().length, this.vStart() + visible);
+    },
+    vSlice() { return this.filteredMemories().slice(this.vStart(), this.vEnd()); },
+
+    prevPage() { if (this.offset > 0) { this.offset = Math.max(0, this.offset - this.pageSize); this.loadMemories(); } },
+    nextPage() { if (this.offset + this.pageSize < this.total) { this.offset += this.pageSize; this.loadMemories(); } },
+    pageInfo() {
+      if (!this.total) return '0 Memories';
+      const from = this.offset + 1;
+      const to = Math.min(this.offset + this.pageSize, this.total);
+      const pages = Math.ceil(this.total / this.pageSize);
+      const cur = Math.floor(this.offset / this.pageSize) + 1;
+      return `${from}–${to} von ${this.total} · Seite ${cur}/${pages}`;
+    },
+    toggleSort(col) {
+      if (this.sort === col) { this.order = this.order === 'desc' ? 'asc' : 'desc'; }
+      else { this.sort = col; this.order = 'desc'; }
+      this.offset = 0;
+      this.loadMemories();
+    },
+    sortArrow(col) { return this.sort === col ? (this.order === 'desc' ? '↓' : '↑') : ''; },
+
+    // ════ audit pagination ════
+    auditPrev() { if (this.auditOffset > 0) { this.auditOffset = Math.max(0, this.auditOffset - this.auditPageSize); this.loadAudit(); } },
+    auditNext() { if (this.auditOffset + this.auditPageSize < this.auditTotal) { this.auditOffset += this.auditPageSize; this.loadAudit(); } },
+    auditPageInfo() {
+      if (!this.auditTotal) return '0 Events';
+      const from = this.auditOffset + 1;
+      const to = Math.min(this.auditOffset + this.auditPageSize, this.auditTotal);
+      const pages = Math.ceil(this.auditTotal / this.auditPageSize);
+      const cur = Math.floor(this.auditOffset / this.auditPageSize) + 1;
+      return `${from}–${to} von ${this.auditTotal} · Seite ${cur}/${pages}`;
+    },
+
+    // ════ security warnings ════
+    get criticalWarning() {
+      const w = this.status?.security?.warnings || [];
+      return w.find(x => x.code === 'network_exposed' || x.level === 'critical') || null;
+    },
+    get otherWarnings() {
+      const w = this.status?.security?.warnings || [];
+      return w.filter(x => x.code !== 'network_exposed' && x.level !== 'critical');
+    },
+
+    // ════ sleep helpers ════
+    nextRun() {
+      const s = this.sleep;
+      if (!s) return '—';
+      if (s.state === 'running') return 'läuft gerade';
+      const remain = (s.threshold_seconds || 0) - (s.idle_seconds || 0);
+      if (remain <= 0) return 'fällig';
+      return 'in ~' + this.fmtDuration(remain);
+    },
+    sleepTasks() {
+      const cp = this.sleep?.checkpoint || {};
+      const defs = [
+        ['_task_dedup_today', 'Dedup'],
+        ['_task_rescore_stale', 'Rescore'],
+        ['_task_cluster_similar', 'Cluster'],
+        ['_task_prepare_briefing', 'Briefing'],
+      ];
+      return defs.map(([key, label]) => ({ key, label, done: cp[key] === true }));
+    },
+
+    // ════ formatting ════
+    preview(text) {
+      const t = (text || '').replace(/\s+/g, ' ').trim();
+      return t.length > 100 ? t.slice(0, 100) + '…' : (t || '—');
+    },
+    fmtScore(s) { return (s === null || s === undefined) ? '—' : Number(s).toFixed(2); },
+    fmtDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (isNaN(d)) return iso;
+      return d.toLocaleString('de-DE', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    },
+    fmtDuration(sec) {
+      sec = Math.max(0, Math.floor(sec || 0));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    },
+    renderMarkdown(text) {
+      if (!text) return '<p class="text-muted/50">— kein Inhalt —</p>';
+      const html = marked.parse(text, { breaks: true, gfm: true });
+      return DOMPurify.sanitize(html);
+    },
+    copyPath(path) {
+      navigator.clipboard?.writeText(path).then(() => {
+        this.copied = true;
+        setTimeout(() => this.copied = false, 1500);
+      });
+    },
+
+    // ════ color helpers ════
+    scoreColor(s) {
+      if (s === null || s === undefined) return 'bg-bg text-muted';
+      if (s < 0.3) return 'bg-red-500/15 text-red-400';
+      if (s <= 0.7) return 'bg-yellow-500/15 text-yellow-300';
+      return 'bg-cta/15 text-cta';
+    },
+    resultColor(r) {
+      if (r === 'success') return 'bg-cta/15 text-cta';
+      if (r === 'blocked' || r === 'denied') return 'bg-red-500/15 text-red-400';
+      if (r === 'warning') return 'bg-yellow-500/15 text-yellow-300';
+      return 'bg-bg text-muted';
+    },
+    statusBadge(s) {
+      if (s === 'active') return 'bg-cta/15 text-cta';
+      if (s === 'cold_storage') return 'bg-sky-500/15 text-sky-400';
+      if (s === 'forgotten' || s === 'deleted') return 'bg-red-500/15 text-red-400';
+      if (s === 'superseded') return 'bg-yellow-500/15 text-yellow-300';
+      return 'bg-bg text-muted';
+    },
+    guardColor(g) {
+      if (g === 'clean' || g === 'allow') return 'bg-cta/15 text-cta';
+      if (g === 'warning') return 'bg-yellow-500/15 text-yellow-300';
+      if (g === 'legacy') return 'bg-bg text-muted';
+      return 'bg-bg text-muted';
+    },
+    sleepStateColor(s) {
+      if (s === 'running') return 'bg-yellow-500/15 text-yellow-300';
+      if (s === 'completed') return 'bg-cta/15 text-cta';
+      return 'bg-bg text-muted';
+    },
+    histBarColor(i) {
+      return ['bg-red-500/60', 'bg-orange-500/60', 'bg-yellow-500/60', 'bg-lime-500/60', 'bg-cta/70'][i] || 'bg-cta/60';
+    },
+    histBarHeight(count) {
+      const counts = (this.status?.decay_distribution || []).map(b => b.count);
+      const max = Math.max(1, ...counts);
+      return Math.round((count / max) * 100);
+    },
+  };
+}
+</script>
+</body>
+</html>
