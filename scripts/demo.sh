@@ -130,4 +130,9 @@ curl -fsS "${auth_header[@]}" "${BASE}/api/v1/explain/${PREF_ID}" | pretty_json
 echo ""
 
 echo -e "${GREEN}${BOLD}Mnémlet runs locally with throwaway auth, sanitized audit, and inspectable trust metadata.${RESET}"
+echo ""
+echo -e "${YELLOW}> v0.4 (opt-in): intelligent memory extraction${RESET}"
+echo -e "${DIM}With an LLM enabled ([llm].enabled + [intelligence].extraction_enabled), the${RESET}"
+echo -e "${DIM}'mnemlet_observe' MCP tool buffers conversations and the LLM extracts memories${RESET}"
+echo -e "${DIM}and summaries per session. Disabled here (no LLM). See docs/INTELLIGENT_EXTRACTION.md${RESET}"
 echo -e "${DIM}github.com/christoph/mnemlet${RESET}"

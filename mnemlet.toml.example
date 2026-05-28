@@ -27,3 +27,12 @@ provider = "searxng"
 base_url = "http://localhost:8888"
 engines = ["google", "duckduckgo", "wikipedia"]
 max_queries_per_sleep = 10
+
+[intelligence]
+# v0.4 intelligent memory extraction (requires [llm].enabled = true).
+# Off by default; mnemlet_ingest still stores content verbatim.
+extraction_enabled = false
+extract_memories = true
+summarize_conversations = true
+inactivity_threshold_minutes = 10
+max_messages = 100

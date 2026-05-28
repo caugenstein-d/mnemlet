@@ -29,7 +29,7 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 
 - 🧠 **Exponential decay + interaction-weighting** — Memories you recall and update stay sharp. What you ignore fades. No infinite hoarding.
 - 😴 **Sleep Engine** — Nightly consolidation runs while you're away: deduplicate, rescore stale memories, cluster related knowledge, and generate a morning briefing. Like your brain during REM sleep.
-- 🔌 **MCP-native with 15 tools** — `mnemlet_ingest`/`mnemlet_recall`/`mnemlet_search` for the basics, `mnemlet_context`/`mnemlet_explain` for context packs with provenance, `mnemlet_remember`/`mnemlet_forget`/`mnemlet_replace`/`mnemlet_confirm` for memory review, `mnemlet_audit` for security event inspection, plus `mnemlet_status`/`mnemlet_namespaces`/`mnemlet_update`/`mnemlet_decay_config`/`mnemlet_export` for admin. Works with OpenWebUI, OpenClaw, Claude Code, Cursor, or any MCP client.
+- 🔌 **MCP-native with 16 tools** — `mnemlet_ingest`/`mnemlet_recall`/`mnemlet_search` for the basics, `mnemlet_observe` to feed conversations into the v0.4 extraction pipeline, `mnemlet_context`/`mnemlet_explain` for context packs with provenance, `mnemlet_remember`/`mnemlet_forget`/`mnemlet_replace`/`mnemlet_confirm` for memory review, `mnemlet_audit` for security event inspection, plus `mnemlet_status`/`mnemlet_namespaces`/`mnemlet_update`/`mnemlet_decay_config`/`mnemlet_export` for admin. Works with OpenWebUI, OpenClaw, Claude Code, Cursor, or any MCP client.
 - 🛡️ **v0.3 Trust / Security / Privacy** — API-key auth, Secret Guard write protection, sanitized Audit logs, namespace trust policies, and backup/restore for local-first operators.
 - 📂 **Inspectable Markdown vault** — Every memory as a `.md` file with YAML frontmatter. Open in Obsidian. `grep` it. `git` it. No black box database lock-in.
 - 🤖 **Optional local LLM** — Plug in Gemma3:4b via Ollama. Runs CPU-only on a Pi. Enhances sleep consolidation (contradiction detection, summarization).
@@ -54,7 +54,7 @@ No checkmark bingo. Here's where Mnémlet shines, and where it doesn't.
 | **Inspectable vault** | ✅ (Markdown) | ❌ | ❌ | ⚠️ (beta) | ❌ |
 | **TUI Dashboard** | ❌ | ❌ | ❌ | ✅ | ❌ |
 | **Cloud sync** | ❌ | ✅ | ❌ | ✅ | ✅ |
-| **MCP tools** | 15 | ~10 | 29 | 19 | ❌ (API) |
+| **MCP tools** | 16 | ~10 | 29 | 19 | ❌ (API) |
 | **Language** | Python | Python | Python | Go | HTTP API |
 | **License** | MIT | Apache 2.0 | MIT | MIT | MIT |
 | **Pi-friendly RAM** | ✅ (450 MB) | ❌ | ✅ | ✅ | ❌ |
@@ -212,6 +212,12 @@ After 2 hours of inactivity, Mnémlet enters consolidation. Tasks run sequential
 
 You can trigger sleep manually via `/api/v1/sleep/start` or check status via `/api/v1/sleep/status`.
 
+### Intelligent Memory Extraction (v0.4, opt-in)
+
+With an LLM enabled, Mnémlet stops hoarding raw chat lines and instead learns from conversations. Messages fed via the `mnemlet_observe` MCP tool are buffered per session; when a session ends (10 min inactivity, a size cap, or shutdown) the LLM **extracts** discrete memories (preferences, facts, decisions, context) and **summarizes** the whole discussion. Platform adapters normalize OpenWebUI, Claude Code, OpenCode, OpenClaw, Cursor, Claude Desktop, and generic MCP clients into one format. The morning briefing is upgraded to a real LLM-written summary.
+
+This is **off by default** — set `[llm].enabled` and `[intelligence].extraction_enabled` to turn it on. `mnemlet_ingest` still stores content immediately and verbatim. See [docs/INTELLIGENT_EXTRACTION.md](docs/INTELLIGENT_EXTRACTION.md).
+
 ### Inspectable Vault
 
 ```
@@ -251,7 +257,7 @@ Every memory is a Markdown file with YAML frontmatter. You can read, edit, versi
 | `/api/v1/sleep/status` | GET | Sleep engine state |
 | `/api/v1/sleep/start` | POST | Start sleep cycle manually |
 | `/api/v1/sleep/stop` | POST | Stop sleep cycle gracefully |
-| `/mcp` | SSE | MCP server endpoint (14 tools) |
+| `/mcp` | SSE | MCP server endpoint (16 tools) |
 | `/ui` | GET | Read-only web dashboard (served without auth; data flows through the protected `/api/v1` endpoints) |
 
 ---
