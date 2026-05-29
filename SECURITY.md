@@ -1,6 +1,6 @@
 # Security Policy
 
-## Current State (v0.3 Trust / Security / Privacy)
+## Current State (v0.3+ Trust / Security / Privacy)
 
 Mnémlet is local-first infrastructure. It binds to `127.0.0.1` by default and is designed to run near your AI agents on hardware you control.
 
