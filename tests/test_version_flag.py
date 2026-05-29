@@ -3,6 +3,8 @@
 import subprocess
 import sys
 
+from mnemlet import __version__
+
 
 def test_version_flag():
     """mnemlet --version should print version and exit."""
@@ -12,4 +14,4 @@ def test_version_flag():
         text=True,
     )
     assert result.returncode == 0
-    assert "0.3.0" in result.stdout or "0.3.0" in result.stderr
+    assert __version__ in result.stdout or __version__ in result.stderr
