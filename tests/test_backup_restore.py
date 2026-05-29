@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import shutil
 import sqlite3
 import subprocess
 import tarfile
@@ -278,9 +279,13 @@ def test_restore_removes_stale_sidecars_absent_from_backup(tmp_path: Path) -> No
 def test_cli_backup_prints_archive_under_requested_output(tmp_path: Path) -> None:
     output_dir = tmp_path / "backups"
     env = {**os.environ, "MNEMLET_DATA_DIR": str(tmp_path / "data")}
+    
+    mnemlet_cmd = shutil.which("mnemlet")
+    if mnemlet_cmd is None:
+        pytest.skip("mnemlet command not found in PATH")
 
     result = subprocess.run(
-        [".venv/bin/mnemlet", "backup", "--output", str(output_dir)],
+        [mnemlet_cmd, "backup", "--output", str(output_dir)],
         check=True,
         cwd=Path(__file__).parents[1],
         env=env,
@@ -298,9 +303,13 @@ def test_cli_backup_from_empty_data_dir_includes_restorable_db(tmp_path: Path) -
     output_dir = tmp_path / "backups"
     data_dir = tmp_path / "data"
     env = {**os.environ, "MNEMLET_DATA_DIR": str(data_dir)}
+    
+    mnemlet_cmd = shutil.which("mnemlet")
+    if mnemlet_cmd is None:
+        pytest.skip("mnemlet command not found in PATH")
 
     result = subprocess.run(
-        [".venv/bin/mnemlet", "backup", "--output", str(output_dir)],
+        [mnemlet_cmd, "backup", "--output", str(output_dir)],
         check=True,
         cwd=Path(__file__).parents[1],
         env=env,
