@@ -8,7 +8,7 @@ Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](htt
 
 > **Pronounced** `/ˈnɛm.lɛt/` *("NEM-let")* — from Greek *mnēmē* (memory) + *-let* (diminutive: small). The CLI command is `mnemlet` (ASCII), the project name is **Mnémlet**.
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/caugenstein-d/mnemlet)
+[![Version](https://img.shields.io/badge/version-0.4.1-blue)](https://github.com/caugenstein-d/mnemlet)
 [![PyPI](https://img.shields.io/pypi/v/mnemlet.svg)](https://pypi.org/project/mnemlet/)
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
