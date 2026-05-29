@@ -34,7 +34,7 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 - 📂 **Inspectable Markdown vault** — Every memory as a `.md` file with YAML frontmatter. Open in Obsidian. `grep` it. `git` it. No black box database lock-in.
 - 🤖 **Optional local LLM** — Plug in Gemma3:4b via Ollama. Runs CPU-only on a Pi. Enhances sleep consolidation (contradiction detection, summarization).
 - 🔍 **Hybrid search** — BM25 (SQLite FTS5) + vector similarity (ChromaDB). Both local, both free.
-- 🥧 **Pi-ready** — 450 MB RAM baseline, ~4 GB with LLM. Runs on a Raspberry Pi 5 (16 GB recommended for the full stack).
+- 🥧 **Pi-ready** — 450 MB RAM baseline for core features (decay, sleep, vault, auth). Runs on a Raspberry Pi 5. LLM-powered extraction (v0.4) needs more power — a beefy workstation, remote LLM host, or cloud API.
 - 💰 **Zero API costs** — Local ONNX embeddings (all-MiniLM-L6-v2). No OpenAI key, no cloud embedding service, no per-call charges. SearXNG optionally self-hosted for web enrichment.
 - 🐍 **Python SDK, REST API, CLI** — `pip install mnemlet`, then `mnemlet serve`. Available on PyPI.
 
@@ -296,7 +296,7 @@ Mnémlet runs on a Raspberry Pi 5. The 16 GB model is recommended if you're runn
 | + SearXNG | ~650 MB |
 | + Gemma3:4b (Ollama) | ~4 GB total |
 
-This is the actual stack I run: Mnémlet + OpenWebUI + OpenCode + OpenClaw on two Pi 5s in my homelab.
+This is my actual setup: Mnémlet core (decay, sleep, vault, auth) runs on a Pi 5 in my homelab alongside OpenWebUI, OpenCode, and OpenClaw. The v0.4 LLM extraction features are tested and production-ready, but need more RAM/CPU than my Pi provides — so I run them on a separate workstation when I want intelligent extraction.
 
 ---
 
@@ -342,7 +342,9 @@ That's it. No system files, no daemons, no databases left behind. We respect you
 
 ## Maintainer Statement
 
-I maintain this because I use it daily. It powers my homelab AI stack — OpenWebUI, OpenCode, and OpenClaw on two Raspberry Pi 5s. It lives as long as I use it. Bug reports and pull requests are welcome, but set expectations accordingly: this is a solo-dev, dogfooded project.
+I maintain this because I believe in the vision: AI memory that's local, transparent, and forgets what doesn't matter. I use the core features daily on my Raspberry Pi — decay, sleep consolidation, the inspectable vault, auth, backup/restore. The v0.4 LLM extraction is tested and works, but needs more power than my current Pi setup provides, so I run it on a separate workstation when I want intelligent conversation extraction.
+
+This is a solo-dev project built on conviction, not daily dogfooding of every feature. Bug reports and pull requests are welcome, but set expectations accordingly.
 
 ---
 
