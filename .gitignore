@@ -10,6 +10,10 @@ htmlcov/
 .coverage
 .coverage.*
 
+# macOS
+.DS_Store
+._*
+
 # Mnémlet benchmarks
 benchmarks/private/*
 !benchmarks/private/.gitkeep
