@@ -31,10 +31,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://christoph.github.io/mnemlet"
-Repository = "https://github.com/christoph/mnemlet"
-Documentation = "https://github.com/christoph/mnemlet#readme"
-Issues = "https://github.com/christoph/mnemlet/issues"
+Homepage = "https://caugenstein-d.github.io/mnemlet"
+Repository = "https://github.com/caugenstein-d/mnemlet"
+Documentation = "https://github.com/caugenstein-d/mnemlet#readme"
+Issues = "https://github.com/caugenstein-d/mnemlet/issues"
 
 [project.optional-dependencies]
 dev = [

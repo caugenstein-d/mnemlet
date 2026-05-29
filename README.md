@@ -8,14 +8,14 @@ Built for [r/selfhosted](https://reddit.com/r/selfhosted) and [r/LocalLLaMA](htt
 
 > **Pronounced** `/ˈnɛm.lɛt/` *("NEM-let")* — from Greek *mnēmē* (memory) + *-let* (diminutive: small). The CLI command is `mnemlet` (ASCII), the project name is **Mnémlet**.
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/christoph/mnemlet)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/caugenstein-d/mnemlet)
 [![PyPI](https://img.shields.io/pypi/v/mnemlet.svg)](https://pypi.org/project/mnemlet/)
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Pi-Tested](https://img.shields.io/badge/pi--tested-RPi%205%2016GB-brightgreen)](https://www.raspberrypi.com/)
-[![Tests](https://github.com/christoph/mnemlet/actions/workflows/test.yml/badge.svg)](https://github.com/christoph/mnemlet/actions/workflows/test.yml)
+[![Tests](https://github.com/caugenstein-d/mnemlet/actions/workflows/test.yml/badge.svg)](https://github.com/caugenstein-d/mnemlet/actions/workflows/test.yml)
 [![Demo](https://img.shields.io/badge/demo-asciinema-ff69b4)](scripts/demo.cast)
-[![Website](https://img.shields.io/badge/web-mnemlet.dev-22C55E)](https://christoph.github.io/mnemlet)
+[![Website](https://img.shields.io/badge/web-mnemlet.dev-22C55E)](https://caugenstein-d.github.io/mnemlet)
 
 <p align="center">
   <img src="docs/assets/mnemlet-vault-preview.svg" alt="Mnémlet Markdown vault preview showing frontmatter, namespace, retention score, and memory content" width="840">
@@ -44,7 +44,7 @@ Mnémlet is a self-hosted memory engine for AI agents. It learns what matters, f
 
 No checkmark bingo. Here's where Mnémlet shines, and where it doesn't.
 
-| | [Mnémlet](https://github.com/christoph/mnemlet) | [Mem0](https://github.com/mem0ai/mem0) | [MemPalace](https://github.com/MemPalace/mempalace) | [Engram](https://github.com/Gentleman-Programming/engram) | [NeoCortex](https://github.com/tinyhumansai/neocortex) |
+| | [Mnémlet](https://github.com/caugenstein-d/mnemlet) | [Mem0](https://github.com/mem0ai/mem0) | [MemPalace](https://github.com/MemPalace/mempalace) | [Engram](https://github.com/Gentleman-Programming/engram) | [NeoCortex](https://github.com/tinyhumansai/neocortex) |
 |---|---|---|---|---|---|
 | **Self-hosted** | ✅ | ⚠️ (platform) | ✅ | ✅ | ❌ (API-only) |
 | **Decay / Forgetting** | ✅ (deep) | ❌ | ❌ | ❌ | ✅ |
@@ -76,7 +76,7 @@ pip install mnemlet
 Or install from source for the latest development version:
 
 ```bash
-pip install git+https://github.com/christoph/mnemlet.git
+pip install git+https://github.com/caugenstein-d/mnemlet.git
 ```
 
 ### Start the server

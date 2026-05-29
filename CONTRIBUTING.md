@@ -8,14 +8,14 @@ before you write code.
 
 - Check [ROADMAP.md](ROADMAP.md) — the feature you have in mind may
   already be planned or deliberately deferred.
-- For bugs, use the [Bug report](https://github.com/christoph/mnemlet/issues/new?template=bug_report.yml) form.
-- For features, use the [Feature request](https://github.com/christoph/mnemlet/issues/new?template=feature_request.yml) form.
+- For bugs, use the [Bug report](https://github.com/caugenstein-d/mnemlet/issues/new?template=bug_report.yml) form.
+- For features, use the [Feature request](https://github.com/caugenstein-d/mnemlet/issues/new?template=feature_request.yml) form.
 - For security issues, **do not file a public issue** — follow [SECURITY.md](SECURITY.md).
 
 ## Local setup
 
 ```bash
-git clone https://github.com/christoph/mnemlet.git
+git clone https://github.com/caugenstein-d/mnemlet.git
 cd mnemlet
 python -m venv .venv
 source .venv/bin/activate

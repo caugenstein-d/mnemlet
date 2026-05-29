@@ -107,7 +107,7 @@ What changed:
   - Added fourth feature card: `Explains Its Memory`.
   - Demo block now uses isolated demo server `127.0.0.1:14060` and shows remember/sleep/context/explain.
   - MCP tools count changed from `8` to `14`.
-  - Quickstart install changed to `pip install git+https://github.com/christoph/mnemlet.git@v0.2.0`.
+  - Quickstart install changed to `pip install git+https://github.com/caugenstein-d/mnemlet.git@v0.2.0`.
   - PyPI CTA/footer replaced with Roadmap links.
   - Added motion-reduce/focus-visible accessibility polish.
 - `website/og-image.svg` updated from v0.1/verbosemode to v0.2/christoph.
