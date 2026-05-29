@@ -6,7 +6,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
 authors = [
-    {name = "Christoph", email = "christoph@mnemlet.dev"}
+    {name = "Christoph Augenstein-Drescher", email = "developer@augenstein.consulting"}
 ]
 keywords = ["memory", "ai", "self-hosted", "local-first", "raspberry-pi", "mcp"]
 classifiers = [
