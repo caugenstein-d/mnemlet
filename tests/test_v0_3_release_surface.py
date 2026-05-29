@@ -36,7 +36,7 @@ def test_demo_uses_throwaway_auth_and_audit_flow() -> None:
 
 def test_website_demo_matches_v0_3_secret_guard_runtime_shape() -> None:
     """Website demo mirrors the real Secret Guard and audit response shape."""
-    text = Path("website/index.html").read_text()
+    text = Path("docs/index.html").read_text()
 
     assert "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" in text
     assert "Content-Type: application/json" in text
@@ -99,26 +99,26 @@ def test_demo_cast_visible_curl_posts_include_content_type() -> None:
 def test_quickstart_does_not_pin_v0_2_0() -> None:
     """Quickstart install instructions must not pin @v0.2.0 while documenting v0.3 auth."""
     readme = Path("README.md").read_text()
-    website = Path("website/index.html").read_text()
+    website = Path("docs/index.html").read_text()
 
     assert "@v0.2.0" not in readme, (
         "README.md still pins @v0.2.0 in install — misleading alongside v0.3 auth docs"
     )
     assert "@v0.2.0" not in website, (
-        "website/index.html still pins @v0.2.0 in install — misleading alongside v0.3 auth docs"
+        "docs/index.html still pins @v0.2.0 in install — misleading alongside v0.3 auth docs"
     )
 
 
 def test_pypi_installation_documented() -> None:
     """PyPI installation is documented as the primary install method."""
     readme = Path("README.md").read_text()
-    website = Path("website/index.html").read_text()
+    website = Path("docs/index.html").read_text()
 
     assert "pip install mnemlet" in readme, (
         "README.md should document 'pip install mnemlet' as primary install method"
     )
     assert "pip install mnemlet" in website, (
-        "website/index.html should document 'pip install mnemlet' as primary install method"
+        "docs/index.html should document 'pip install mnemlet' as primary install method"
     )
     assert "pypi.org/project/mnemlet" in readme, (
         "README.md should link to PyPI project page"
